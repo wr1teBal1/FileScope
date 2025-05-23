@@ -3,9 +3,7 @@ project(FileScope VERSION 0.1.0 LANGUAGES C CXX)
 
 add_executable(FileScope
     main.c
-    src/log.c
-    src/resources.c
-    src/ui.c
+
 )
 
 #指定SDL3的头文件路径

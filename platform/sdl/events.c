@@ -6,3 +6,20 @@
  * 3. 窗口事件处理
  * 4. 事件分发系统
  */
+
+#include "SDL3/SDL.h"
+
+
+
+void app_events(struct Application *a) {
+        // 处理事件
+    while (SDL_PollEvent(&a->event)) {
+        switch (a->event.type) {
+            case SDL_EVENT_QUIT:
+                a->is_running = false;
+                break;
+            default:
+                break;
+        }
+    }
+}
