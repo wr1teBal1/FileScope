@@ -9,19 +9,29 @@ int create_file(const char* filename) {
     fclose(file);
     return 0; // 创建成功
 }
+
 //打开文件
-FILE* open_file(const char*filename,const char*mode){
-    return fopen(filename,mode);
+FILE* open_file(const char* filename, const char* mode) {
+    if (filename == NULL || mode == NULL) {
+        return NULL;
+    }
+    return fopen(filename, mode);
 }
 
 //关闭文件
-int close_file(FILE*fp){
-    fclose(fp);
-    if(fp==NULL){
-        return -1;
-
+int close_file(FILE* fp) {
+    if (fp == NULL) {
+        return -1; // 无效的文件指针
     }
+    
+    int result = fclose(fp);
+    if (result == EOF) {
+        return -2; // 关闭文件失败
+    }
+    
+    return 0; // 关闭成功
 }
+
 // 写入文件
 int write_to_file(const char* filename, const char* content) {
     FILE* file = fopen(filename, "w");

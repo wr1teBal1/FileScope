@@ -10,14 +10,26 @@ int main() {
         return 1;
     }
 
-    // 测试写入文件
+    // 测试打开文件并写入
+    FILE* file = open_file("test.txt", "w");
+    if (file == NULL) {
+        printf("文件打开失败\n");
+        return 1;
+    }//直接返回值即可，不要搞什么SB判断
+
     const char* content = "Hello, 这是一个测试文件内容！\n";
-    if (write_to_file("test.txt", content) == 0) {
-        printf("文件写入成功\n");
-    } else {
+    if (fputs(content, file) == EOF) {
         printf("文件写入失败\n");
+        close_file(file);
         return 1;
     }
+
+    // 测试关闭文件
+    if (close_file(file) != 0) {
+        printf("文件关闭失败\n");
+        return 1;
+    }
+    printf("文件写入并关闭成功\n");
 
     // 测试读取文件
     char* read_content = read_file("test.txt");
