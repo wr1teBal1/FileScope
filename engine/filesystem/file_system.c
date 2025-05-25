@@ -6,3 +6,640 @@
  * 3. 处理文件系统错误
  * 4. 管理文件系统权限
  */
+
+#include "file_system.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <pwd.h>
+
+// 当前错误码
+static FSError last_error = FS_ERROR_NONE;
+
+// 获取最后一次错误
+FSError fs_get_last_error(void) {
+    return last_error;
+}
+
+// 获取错误描述
+const char* fs_get_error_string(FSError error) {
+    switch (error) {
+        case FS_ERROR_NONE:
+            return "No error";
+        case FS_ERROR_ACCESS_DENIED:
+            return "Access denied";
+        case FS_ERROR_NOT_FOUND:
+            return "File or directory not found";
+        case FS_ERROR_ALREADY_EXISTS:
+            return "File or directory already exists";
+        case FS_ERROR_DISK_FULL:
+            return "Disk is full";
+        case FS_ERROR_INVALID_NAME:
+            return "Invalid file or directory name";
+        case FS_ERROR_UNKNOWN:
+        default:
+            return "Unknown error";
+    }
+}
+
+// 设置错误码
+static void fs_set_error(FSError error) {
+    last_error = error;
+}
+
+// 根据系统错误码设置错误
+static void fs_set_error_from_errno(void) {
+    switch (errno) {
+        case EACCES:
+        case EPERM:
+            fs_set_error(FS_ERROR_ACCESS_DENIED);
+            break;
+        case ENOENT:
+            fs_set_error(FS_ERROR_NOT_FOUND);
+            break;
+        case EEXIST:
+            fs_set_error(FS_ERROR_ALREADY_EXISTS);
+            break;
+        case ENOSPC:
+            fs_set_error(FS_ERROR_DISK_FULL);
+            break;
+        case EINVAL:
+            fs_set_error(FS_ERROR_INVALID_NAME);
+            break;
+        default:
+            fs_set_error(FS_ERROR_UNKNOWN);
+            break;
+    }
+}
+
+// 获取当前工作目录
+char* fs_get_current_directory(void) {
+    char *buffer = NULL;
+    size_t size = 256;
+    char *result = NULL;
+
+    do {
+        buffer = realloc(buffer, size);
+        if (!buffer) {
+            fs_set_error(FS_ERROR_UNKNOWN);
+            return NULL;
+        }
+
+        result = getcwd(buffer, size);
+        if (!result) {
+            if (errno == ERANGE) {
+                // 缓冲区太小，增加大小
+                size *= 2;
+            } else {
+                // 其他错误
+                fs_set_error_from_errno();
+                free(buffer);
+                return NULL;
+            }
+        }
+    } while (!result);
+
+    return buffer;
+}
+
+// 设置当前工作目录
+bool fs_set_current_directory(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    if (chdir(path) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return true;
+}
+
+// 获取用户主目录
+char* fs_get_home_directory(void) {
+    const char *home = getenv("HOME");
+    if (home) {
+        return strdup(home);
+    }
+
+    // 如果环境变量不可用，尝试从密码数据库获取
+    struct passwd *pw = getpwuid(getuid());
+    if (pw && pw->pw_dir) {
+        return strdup(pw->pw_dir);
+    }
+
+    fs_set_error(FS_ERROR_UNKNOWN);
+    return NULL;
+}
+
+// 检查路径是否存在
+bool fs_path_exists(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        fs_set_error(FS_ERROR_NONE);
+        return true;
+    }
+
+    fs_set_error_from_errno();
+    return false;
+}
+
+// 检查是否为目录
+bool fs_is_directory(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return S_ISDIR(st.st_mode);
+}
+
+// 检查是否为文件
+bool fs_is_file(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return S_ISREG(st.st_mode);
+}
+
+// 检查是否为隐藏文件
+bool fs_is_hidden(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    // 获取文件名（不含路径）
+    const char *filename = fs_get_filename(path);
+    if (!filename) {
+        return false;
+    }
+
+    // 在Unix/Linux/macOS系统中，以.开头的文件被视为隐藏文件
+    fs_set_error(FS_ERROR_NONE);
+    return filename[0] == '.';
+}
+
+// 获取文件大小
+size_t fs_get_file_size(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return 0;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        fs_set_error_from_errno();
+        return 0;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return (size_t)st.st_size;
+}
+
+// 获取文件修改时间
+time_t fs_get_modified_time(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return 0;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        fs_set_error_from_errno();
+        return 0;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return st.st_mtime;
+}
+
+// 获取文件创建时间
+time_t fs_get_created_time(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return 0;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        fs_set_error_from_errno();
+        return 0;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return st.st_ctime;
+}
+
+// 获取文件访问时间
+time_t fs_get_accessed_time(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return 0;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        fs_set_error_from_errno();
+        return 0;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return st.st_atime;
+}
+
+// 读取目录内容
+DIR* fs_open_directory(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        fs_set_error_from_errno();
+        return NULL;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return dir;
+}
+
+// 关闭目录
+void fs_close_directory(DIR *dir) {
+    if (dir) {
+        closedir(dir);
+    }
+    fs_set_error(FS_ERROR_NONE);
+}
+
+// 读取下一个目录项
+struct dirent* fs_read_directory(DIR *dir) {
+    if (!dir) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    errno = 0;
+    struct dirent *entry = readdir(dir);
+    if (!entry && errno != 0) {
+        fs_set_error_from_errno();
+    } else {
+        fs_set_error(FS_ERROR_NONE);
+    }
+
+    return entry;
+}
+
+// 创建目录
+bool fs_create_directory(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    // 创建目录，权限设置为 0755 (rwxr-xr-x)
+    if (mkdir(path, 0755) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return true;
+}
+
+// 删除文件
+bool fs_delete_file(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    if (unlink(path) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return true;
+}
+
+// 删除目录
+bool fs_delete_directory(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    if (rmdir(path) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return true;
+}
+
+// 重命名文件或目录
+bool fs_rename(const char *old_path, const char *new_path) {
+    if (!old_path || !new_path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    if (rename(old_path, new_path) != 0) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return true;
+}
+
+// 复制文件
+bool fs_copy_file(const char *src_path, const char *dst_path) {
+    if (!src_path || !dst_path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return false;
+    }
+
+    FILE *src = fopen(src_path, "rb");
+    if (!src) {
+        fs_set_error_from_errno();
+        return false;
+    }
+
+    FILE *dst = fopen(dst_path, "wb");
+    if (!dst) {
+        fs_set_error_from_errno();
+        fclose(src);
+        return false;
+    }
+
+    // 复制文件内容
+    char buffer[4096];
+    size_t bytes_read;
+    bool success = true;
+
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+        if (fwrite(buffer, 1, bytes_read, dst) != bytes_read) {
+            fs_set_error_from_errno();
+            success = false;
+            break;
+        }
+    }
+
+    if (ferror(src)) {
+        fs_set_error_from_errno();
+        success = false;
+    }
+
+    fclose(src);
+    fclose(dst);
+
+    if (success) {
+        fs_set_error(FS_ERROR_NONE);
+    }
+
+    return success;
+}
+
+// 移动文件
+bool fs_move_file(const char *src_path, const char *dst_path) {
+    // 尝试直接重命名（在同一文件系统上效率更高）
+    if (fs_rename(src_path, dst_path)) {
+        return true;
+    }
+
+    // 如果重命名失败，尝试复制后删除
+    if (fs_copy_file(src_path, dst_path)) {
+        return fs_delete_file(src_path);
+    }
+
+    return false;
+}
+
+// 获取文件扩展名
+const char* fs_get_extension(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    const char *filename = fs_get_filename(path);
+    if (!filename) {
+        return NULL;
+    }
+
+    const char *dot = strrchr(filename, '.');
+    if (!dot || dot == filename) {
+        // 没有扩展名或者文件名以.开头（隐藏文件）
+        fs_set_error(FS_ERROR_NONE);
+        return "";
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return dot + 1;
+}
+
+// 获取文件名（不含路径）
+const char* fs_get_filename(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    // 查找最后一个路径分隔符
+    const char *slash = strrchr(path, '/');
+    if (!slash) {
+        // 没有路径分隔符，整个字符串就是文件名
+        fs_set_error(FS_ERROR_NONE);
+        return path;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return slash + 1;
+}
+
+// 获取文件名（不含扩展名）
+const char* fs_get_basename(const char *path) {
+    static char basename[256];
+    const char *filename = fs_get_filename(path);
+    if (!filename) {
+        return NULL;
+    }
+
+    strncpy(basename, filename, sizeof(basename) - 1);
+    basename[sizeof(basename) - 1] = '\0';
+
+    // 查找最后一个点
+    char *dot = strrchr(basename, '.');
+    if (dot && dot != basename) {
+        // 如果找到点并且不是文件名的开头（隐藏文件），则截断
+        *dot = '\0';
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return basename;
+}
+
+// 获取目录路径（不含文件名）
+const char* fs_get_directory(const char *path) {
+    static char dirname[1024];
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    strncpy(dirname, path, sizeof(dirname) - 1);
+    dirname[sizeof(dirname) - 1] = '\0';
+
+    // 查找最后一个路径分隔符
+    char *slash = strrchr(dirname, '/');
+    if (!slash) {
+        // 没有路径分隔符，返回当前目录
+        fs_set_error(FS_ERROR_NONE);
+        return ".";
+    }
+
+    if (slash == dirname) {
+        // 路径是根目录
+        *(slash + 1) = '\0';
+    } else {
+        // 截断最后一个路径分隔符
+        *slash = '\0';
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return dirname;
+}
+
+// 组合路径
+char* fs_combine_path(const char *path1, const char *path2) {
+    if (!path1 || !path2) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    size_t len1 = strlen(path1);
+    size_t len2 = strlen(path2);
+    size_t len = len1 + len2 + 2; // +2 for '/' and '\0'
+
+    char *result = (char*)malloc(len);
+    if (!result) {
+        fs_set_error(FS_ERROR_UNKNOWN);
+        return NULL;
+    }
+
+    strcpy(result, path1);
+
+    // 确保路径1的末尾有一个斜杠
+    if (len1 > 0 && path1[len1 - 1] != '/') {
+        strcat(result, "/");
+    }
+
+    // 确保路径2的开头没有斜杠
+    if (path2[0] == '/') {
+        strcat(result, path2 + 1);
+    } else {
+        strcat(result, path2);
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return result;
+}
+
+// 获取绝对路径
+char* fs_get_absolute_path(const char *path) {
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    char *abs_path = realpath(path, NULL);
+    if (!abs_path) {
+        fs_set_error_from_errno();
+        return NULL;
+    }
+
+    fs_set_error(FS_ERROR_NONE);
+    return abs_path;
+}
+
+// 获取相对路径
+char* fs_get_relative_path(const char *path, const char *base) {
+    if (!path || !base) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+        return NULL;
+    }
+
+    // 获取绝对路径
+    char *abs_path = fs_get_absolute_path(path);
+    if (!abs_path) {
+        return NULL;
+    }
+
+    char *abs_base = fs_get_absolute_path(base);
+    if (!abs_base) {
+        free(abs_path);
+        return NULL;
+    }
+
+    char *rel_path = NULL;
+    size_t base_len = strlen(abs_base);
+    size_t path_len = strlen(abs_path);
+
+    // 检查路径是否以基础路径开头
+    if (strncmp(abs_path, abs_base, base_len) == 0 && 
+        (abs_path[base_len] == '/' || abs_path[base_len] == '\0')) {
+        // 路径是基础路径的子目录
+        if (abs_path[base_len] == '\0') {
+            // 路径与基础路径相同
+            rel_path = strdup(".");
+        } else {
+            // 跳过基础路径和斜杠
+            rel_path = strdup(abs_path + base_len + 1);
+        }
+    } else {
+        // 路径不是基础路径的子目录，返回原始路径
+        rel_path = strdup(path);
+    }
+
+    free(abs_path);
+    free(abs_base);
+
+    if (!rel_path) {
+        fs_set_error(FS_ERROR_UNKNOWN);
+    } else {
+        fs_set_error(FS_ERROR_NONE);
+    }
+
+    return rel_path;
+}
