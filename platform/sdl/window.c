@@ -7,78 +7,27 @@
  * 4. 多显示器支持
  */
 
-#include "SDL3/SDL.h"
-#include "SDL3/SDL_main.h"
-
-
-#define SDL_FLAGS SDL_INIT_VIDEO
-#define SDL_WINDOW_WIDTH 800
-#define SDL_WINDOW_HEIGHT 600
-#define SDL_WINDOW_TITLE "File Scope"
-
-struct Application {
-    // SDL窗口
-    SDL_Window *window;
-    // SDL渲染器
-    SDL_Renderer *renderer;
-    // SDL纹理
-    SDL_Texture *background;
-    // SDL事件
-    SDL_Event event;
-    // 是否关闭
-    bool is_running;
-
-
-};
-
-bool app_init_sdl(struct Application *a);
-void app_free(struct Application **app);
-void app_run(struct Application *a);
-void app_events(struct Application *a);
-void app_draw(struct Application *a);
-bool app_new(struct Application **app);
-bool game_load_texture(struct Application *a);
-
-// SDL初始化
-bool app_init_sdl(struct Application *a){
-    // 初始化SDL
-    if (SDL_Init(SDL_FLAGS) < 0) {
-        fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
-        return false;
-    }
-    // 创建SDL窗口
-    a->window = SDL_CreateWindow(SDL_WINDOW_TITLE, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOW_WIDTH, SDL_WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
-    if (!a->window) {
-        fprintf(stderr, "Unable to create window: %s\n", SDL_GetError());
-        return false;
-    }
-    // 创建SDL渲染器
-    a->renderer = SDL_CreateRenderer(a->window, -1, 0);
-    if (!a->renderer) {
-        fprintf(stderr, "Unable to create renderer: %s\n", SDL_GetError());
-        return false;
-    }
-
-    //软件图标
-    SDL_Surface *icon = IMG_Load("images/icon.png"); //贴图1
-    if (!icon) {
-        fprintf(stderr, "Unable to load icon: %s\n", SDL_GetError());
-        return false;
-    }  
-    if (!SDL_SetWindowIcon(a->window, icon)) {
-        fprintf(stderr, "Unable to set window icon: %s\n", SDL_GetError());
-        SDL_DESTROY_SURFACE(icon);
-        return false;
-    } 
-    SDL_DESTROY_SURFACE(icon);
+#include "window.h"
+#include "init_sdl.h"
+#include "renderer.h"
  
-    return true;
-}
+
+
 
 // 释放SDL资源
 void app_free(struct Application **app) {
     if (*app){
         struct Application *a = *app;
+        // 释放SDL字体
+        if (a->font) {
+            TTF_CloseFont(a->font);
+            a->font = NULL;
+        }
+        // 释放SDL事件
+        if (a->event) {
+            SDL_DestroyEvent(&a->event);
+            a->event = NULL;
+        } 
         // 释放SDL纹理
         if (a->background) {
             SDL_DestroyTexture(a->background);
@@ -94,6 +43,7 @@ void app_free(struct Application **app) {
             SDL_DestroyWindow(app->window);
             a->window = NULL;
         }
+        TTF_Quit();
         SDL_Quit();
 
         free(a);
