@@ -1,6 +1,9 @@
 // main.c
 #include "main.h"
-
+#include "window.h"
+#include "main_window.h"
+#include "renderer.h"
+#include "event.h"
 
 int main(int argc, char* argv[]) {
     bool exit_status = EXIT_FAILURE;
