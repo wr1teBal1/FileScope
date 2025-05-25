@@ -22,7 +22,7 @@ struct Application {
     // SDL渲染器
     SDL_Renderer *renderer;
     // SDL纹理
-    SDL_Texture *texture;
+    SDL_Texture *background;
     // SDL事件
     SDL_Event event;
     // 是否关闭
@@ -37,6 +37,7 @@ void app_run(struct Application *a);
 void app_events(struct Application *a);
 void app_draw(struct Application *a);
 bool app_new(struct Application **app);
+bool game_load_texture(struct Application *a);
 
 // SDL初始化
 bool app_init_sdl(struct Application *a){
@@ -57,13 +58,20 @@ bool app_init_sdl(struct Application *a){
         fprintf(stderr, "Unable to create renderer: %s\n", SDL_GetError());
         return false;
     }
-    // 创建SDL纹理
-    a->texture = SDL_CreateTexture(a->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SDL_WINDOW_WIDTH, SDL_WINDOW_HEIGHT);
-    if (!a->texture) {
-        fprintf(stderr, "Unable to create texture: %s\n", SDL_GetError());
-        return false;
-    }
 
+    //软件图标
+    SDL_Surface *icon = IMG_Load("images/icon.png"); //贴图1
+    if (!icon) {
+        fprintf(stderr, "Unable to load icon: %s\n", SDL_GetError());
+        return false;
+    }  
+    if (!SDL_SetWindowIcon(a->window, icon)) {
+        fprintf(stderr, "Unable to set window icon: %s\n", SDL_GetError());
+        SDL_DESTROY_SURFACE(icon);
+        return false;
+    } 
+    SDL_DESTROY_SURFACE(icon);
+ 
     return true;
 }
 
@@ -72,9 +80,9 @@ void app_free(struct Application **app) {
     if (*app){
         struct Application *a = *app;
         // 释放SDL纹理
-        if (a->texture) {
-            SDL_DestroyTexture(a->texture);
-            a->texture = NULL;
+        if (a->background) {
+            SDL_DestroyTexture(a->background);
+            a->background = NULL;
         }
         // 释放SDL渲染器
         if (a->renderer) {
@@ -109,15 +117,16 @@ bool app_new(struct Application **app) {
     struct Application *a = *app;
 
     // 初始化应用程序
-    if (!app_init_sdl(a))
-    {
+    if (!app_init_sdl(a)){
         return false;
     }
-    
-    a->is_running = t rue;
-    a->window = NULL;
-    a->renderer = NULL;
-    a->texture = NULL;
+    //
+    if (!app_load_texture(a)){
+        return false;
+    }
+
+    a->is_running = true;
+
 
     return true;
 }

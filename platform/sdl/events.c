@@ -18,6 +18,19 @@ void app_events(struct Application *a) {
             case SDL_EVENT_QUIT:
                 a->is_running = false;
                 break;
+            case SDL_EVENT_KEY_DOWN:
+                switch (a->event.key.scancode) {
+                    case SDL_SCANCODE_ESCAPE:
+                        a->is_running = false;
+                        break;
+                    default: 
+                        break;
+                }
+                break;
+            case SDL_EVENT_WINDOW_CLOSE:
+                a->is_running = false;
+                break;
+
             default:
                 break;
         }

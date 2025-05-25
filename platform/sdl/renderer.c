@@ -12,12 +12,21 @@
 
 void app_draw(struct Application *a) {
     // 清除渲染器
-    SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
-    SDL_RenderClear(a->renderer);
+     SDL_RenderClear(a->renderer);
 
     // 绘制纹理
-    SDL_RenderCopy(a->renderer, a->texture, NULL, NULL);
+    SDL_RenderTexture (a->renderer, a->background , NULL, NULL);
 
     // 显示渲染结果
     SDL_RenderPresent(a->renderer);
+}
+
+bool app_load_texture(struct Application *a) {
+    // 加载纹理
+    a->background = IMG_LoadTexture(a->renderer, "images/事例.png");//贴图2 
+    if (!a->background) { 
+        fprintf(stderr, "Unable to load texture: %s\n", SDL_GetError());
+        return false;
+    }
+    return true;  
 }
