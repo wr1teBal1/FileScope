@@ -8,4 +8,4 @@ void app_draw(struct Application *a);
 bool ttf_show(struct Application *a,string str,SDL_Color color); 
 
 
-#endif
+#endif //RENDERER_H

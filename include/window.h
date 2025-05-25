@@ -30,4 +30,4 @@ void app_free(struct Application **app);
 void app_run(struct Application *a);
 
 
-#endif  WINDOW_H
+#endif  //WINDOW_H

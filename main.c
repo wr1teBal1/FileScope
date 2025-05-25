@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
         exit_status = EXIT_SUCCESS;
     }
     
-    app_free(&app);n
+    app_free(&app);
 
     return exit_status;
 }

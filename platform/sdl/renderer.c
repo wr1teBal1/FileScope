@@ -16,13 +16,15 @@ void app_draw(struct Application *a) {
 
     // 绘制纹理
     SDL_RenderTexture (a->renderer, a->background , NULL, NULL);
+    // 绘制文本
+    SDL_RenderTexture(a->renderer, a->text_image, NULL, NULL);
 
     // 显示渲染结果
     SDL_RenderPresent(a->renderer);
 }
 
 bool app_load_media(struct Application *a) {
-    // 加载纹理
+    // 加载纹理 
     a->background = IMG_LoadTexture(a->renderer, "images/事例.png");//贴图2 
     if (!a->background) { 
         fprintf(stderr, "Unable to load texture: %s\n", SDL_GetError());
@@ -38,12 +40,21 @@ bool app_load_media(struct Application *a) {
 }
  
 bool ttf_show(struct Application *a,string str,SDL_Color color){
-    SDL_Surface *surf == TTF_RenderText_Blended(a->font, str.c_str(),0, color);
+    SDL_Surface *surf = TTF_RenderText_Blended(a->font, str.c_str(),0, color);
     if (!surf) {
         fprintf(stderr, "Unable to create surface: %s\n", TTF_GetError());
         return false;
     }
-    SDL_DESTROY_SURFACE(surf);
-  
+    a->text_image = SDL_CreateTextureFromSurface(a->renderer, surf);
+    SDL_DESTROY_SURFACE(surf); 
+    surf = NULL;
+    if (!a->text_image) {
+        fprintf(stderr, "Unable to  create texture: %s\n", SDL_GetError());
+        return false;
+    }
+    if(!SDL_SetTextureScaleMode(a->text_image, SDL_SCALEMODE_BLEND_NEAREST)){
+        fprintf(stderr, "Unable to set blend mode: %s\n", SDL_GetError());
+        return false; 
+    }
     return true;  
 }

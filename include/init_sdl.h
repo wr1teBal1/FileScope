@@ -5,4 +5,4 @@
 
 bool app_init_sdl(struct Application *a);
 
-#endif  INIT_SDL_H
+#endif  //INIT_SDL_H

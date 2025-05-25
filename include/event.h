@@ -5,4 +5,4 @@
 
 void app_events(struct Application *a);
 
-#endif  EVENT_H
+#endif  //EVENT_H

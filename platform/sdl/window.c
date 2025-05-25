@@ -18,16 +18,16 @@
 void app_free(struct Application **app) {
     if (*app){
         struct Application *a = *app;
+        // 释放SDL文字纹理
+        if (a->text_image) {
+            SDL_DestroyTexture(a->text_image);
+            a->text_image = NULL;
+        }  
         // 释放SDL字体
         if (a->font) {
             TTF_CloseFont(a->font);
             a->font = NULL;
         }
-        // 释放SDL事件
-        if (a->event) {
-            SDL_DestroyEvent(&a->event);
-            a->event = NULL;
-        } 
         // 释放SDL纹理
         if (a->background) {
             SDL_DestroyTexture(a->background);
@@ -71,7 +71,7 @@ bool app_new(struct Application **app) {
         return false;
     }
     //
-    if (!app_load_texture(a)){
+    if (!app_load_media(a)){
         return false;
     }
 
