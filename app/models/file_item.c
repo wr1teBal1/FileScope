@@ -28,6 +28,7 @@ FileItem* file_item_new(const char *path) {
     item->path = strdup(path);
     if (!item->path) {
         free(item);
+        item = NULL;
         return NULL;
     }
 
@@ -82,6 +83,7 @@ void file_item_free(FileItem *item) {
     }
 
     free(item);
+    item = NULL;
 }
 
 // 创建文件列表
@@ -111,9 +113,11 @@ void file_list_free(FileList *list) {
     // 释放当前目录
     if (list->current_dir) {
         free(list->current_dir);
+        list->current_dir = NULL;
     }
 
     free(list);
+    list = NULL;
 }
 
 // 加载目录内容
@@ -128,6 +132,7 @@ bool file_list_load_directory(FileList *list, const char *dir_path) {
     // 设置当前目录
     if (list->current_dir) {
         free(list->current_dir);
+        list->current_dir = NULL;
     }
     list->current_dir = strdup(dir_path);
 

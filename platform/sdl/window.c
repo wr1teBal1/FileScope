@@ -56,7 +56,7 @@ void window_free(struct Window **app) {
     }
 }
 
-bool app_new(struct Window **app) {
+bool window_new(struct Window **app) {
     *app = calloc(1,sizeof(struct Window));//
 
     if (*app == NULL)
@@ -67,11 +67,11 @@ bool app_new(struct Window **app) {
     struct Window *a = *app;
 
     // 初始化应用程序
-    if (!app_init_sdl(a)){
+    if (!window_init_sdl(a)){
         return false;
     }
     //
-    if (!app_load_media(a)){
+    if (!window_load_media(a)){
         return false;
     }
 
@@ -86,9 +86,9 @@ void window_run(struct Window *a)
 {
     while (a->is_running){
         // 处理事件
-        app_events(a);
+        window_events(a);
         // 绘制
-        app_draw(a);
+        window_draw(a);
         // 延时
         SDL_Delay(16);
 

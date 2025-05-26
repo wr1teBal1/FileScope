@@ -10,7 +10,7 @@
 
 
 
-void app_draw(struct Window *a) {
+void window_draw(struct Window *a) {
     // 清除渲染器
      SDL_RenderClear(a->renderer);
 
@@ -23,7 +23,7 @@ void app_draw(struct Window *a) {
     SDL_RenderPresent(a->renderer);
 }
 
-bool app_load_media(struct Window *a) {
+bool window_load_media(struct Window *a) {
     // 加载纹理 
     a->background = IMG_LoadTexture(a->renderer, "images/事例.png");//贴图2 
     if (!a->background) { 
