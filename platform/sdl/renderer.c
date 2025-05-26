@@ -39,8 +39,8 @@ bool app_load_media(struct Window *a) {
     return true;  
 }
  
-bool ttf_show(struct Window *a,const char str,SDL_Color color){
-    SDL_Surface *surf = TTF_RenderText_Blended(a->font, str.c_str(),0, color);
+bool ttf_show(struct Window *a,const char* str,SDL_Color color){
+    SDL_Surface *surf = TTF_RenderText_Blended(a->font, str,0, color);
     if (!surf) {
         fprintf(stderr, "Unable to create surface: %s\n", TTF_GetError());
         return false;

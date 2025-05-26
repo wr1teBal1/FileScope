@@ -5,7 +5,7 @@
 
 bool window_load_media(struct Window *window);
 void window_draw(struct Window *window);
-bool ttf_show(struct Window *window,const char str,SDL_Color color); 
+bool ttf_show(struct Window *window,const char* str,SDL_Color color); 
 
 
 #endif //RENDERER_H
