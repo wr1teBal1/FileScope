@@ -10,7 +10,7 @@ bool window_init_sdl(struct Window *a){
     }
     // 初始化SDL文字
     if (! TTF_Init()) {
-        fprintf(stderr, "Unable to initialize SDL_ttf: %s\n", TTF_GetError());
+        fprintf(stderr, "Unable to initialize SDL_ttf: %s\n", SDL_GetError());
         return false; 
     }
     // 创建SDL窗口
@@ -20,7 +20,8 @@ bool window_init_sdl(struct Window *a){
         return false;
     }
     // 创建SDL渲染器
-    a->renderer = SDL_CreateRenderer(a->window, -1);
+    a->renderer = SDL_CreateRenderer(a->window, NULL);
+     //创建渲染器
     if (!a->renderer) {
         fprintf(stderr, "Unable to create renderer: %s\n", SDL_GetError());
         return false;
