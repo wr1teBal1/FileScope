@@ -52,9 +52,5 @@ bool ttf_show(struct Window *a,const char* str,SDL_Color color){
         fprintf(stderr, "Unable to  create texture: %s\n", SDL_GetError());
         return false;
     }
-    if(!SDL_SetTextureScaleMode(a->text_image, SDL_SCALEMODE_BLEND_NEAREST)){
-        fprintf(stderr, "Unable to set blend mode: %s\n", SDL_GetError());
-        return false; 
-    }
     return true;  
 }

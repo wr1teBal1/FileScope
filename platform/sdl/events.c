@@ -27,9 +27,6 @@ void window_events(struct Window *w) {
                         break;
                 }
                 break;
-            case SDL_EVENT_WINDOW_CLOSE:
-                w->is_running = false;
-                break;
 
             default:
                 break;

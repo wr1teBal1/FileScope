@@ -11,16 +11,16 @@ bool window_init_sdl(struct Window *a){
     // 初始化SDL文字
     if (! TTF_Init()) {
         fprintf(stderr, "Unable to initialize SDL_ttf: %s\n", TTF_GetError());
-        return false;
+        return false; 
     }
     // 创建SDL窗口
-    a->window = SDL_CreateWindow(SDL_WINDOW_TITLE, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOW_WIDTH, SDL_WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+    a->window = SDL_CreateWindow(SDL_WINDOW_TITLE, SDL_WINDOW_WIDTH, SDL_WINDOW_HEIGHT, 0);
     if (!a->window) {
         fprintf(stderr, "Unable to create window: %s\n", SDL_GetError());
         return false;
     }
     // 创建SDL渲染器
-    a->renderer = SDL_CreateRenderer(a->window, -1, 0);
+    a->renderer = SDL_CreateRenderer(a->window, -1);
     if (!a->renderer) {
         fprintf(stderr, "Unable to create renderer: %s\n", SDL_GetError());
         return false;
