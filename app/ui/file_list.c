@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/syslimits.h>
 
 // 默认项目尺寸
 #define DEFAULT_ITEM_WIDTH 100
@@ -231,7 +232,7 @@ void file_list_view_draw(FileListView *view) {
     if (!view->files->head) {
         // 绘制空列表提示
         SDL_Color text_color = {100, 100, 100, 255};
-        SDL_Surface *text_surface = TTF_RenderText_Blended(font, "空文件夹", text_color);
+        SDL_Surface *text_surface = TTF_RenderText_Blended(font, "空文件夹", 0,text_color);
         if (text_surface) {
             SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
             if (text_texture) {
@@ -292,7 +293,7 @@ void file_list_view_draw(FileListView *view) {
                 
                 // 绘制文件名
                 SDL_Color text_color = {0, 0, 0, 255};
-                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->display_name, text_color);
+                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->display_name, 0,text_color);
                 if (text_surface) {
                     SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
                     if (text_texture) {
@@ -345,7 +346,7 @@ void file_list_view_draw(FileListView *view) {
                 
                 // 绘制文件名
                 SDL_Color text_color = {0, 0, 0, 255};
-                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->display_name, text_color);
+                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->display_name,0, text_color);
                 if (text_surface) {
                     SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
                     if (text_texture) {
@@ -368,7 +369,7 @@ void file_list_view_draw(FileListView *view) {
                     const char *size_str = (item->type == FILE_TYPE_DIRECTORY) ? "<目录>" : 
                                           get_size_string(item->size, size_buffer, sizeof(size_buffer));
                     
-                    SDL_Surface *size_surface = TTF_RenderText_Blended(font, size_str, text_color);
+                    SDL_Surface *size_surface = TTF_RenderText_Blended(font, size_str, 0,text_color);
                     if (size_surface) {
                         SDL_Texture *size_texture = SDL_CreateTextureFromSurface(renderer, size_surface);
                         if (size_texture) {
@@ -388,7 +389,7 @@ void file_list_view_draw(FileListView *view) {
                     char time_buffer[64];
                     const char *time_str = get_time_string(item->modified_time, time_buffer, sizeof(time_buffer));
                     
-                    SDL_Surface *time_surface = TTF_RenderText_Blended(font, time_str, text_color);
+                    SDL_Surface *time_surface = TTF_RenderText_Blended(font, time_str,0, text_color);
                     if (time_surface) {
                         SDL_Texture *time_texture = SDL_CreateTextureFromSurface(renderer, time_surface);
                         if (time_texture) {
@@ -647,7 +648,7 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
         
         case SDL_EVENT_KEY_DOWN: {
             // 键盘事件
-            switch (event->key.keysym.sym) {
+            switch (event->key.sym) {
                 case SDLK_UP:
                     if (view->selected_index > 0) {
                         file_list_view_select_item(view, view->selected_index - 1);
