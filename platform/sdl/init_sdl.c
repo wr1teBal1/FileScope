@@ -2,7 +2,7 @@
 
 
 // SDL初始化
-bool app_init_sdl(struct Application *a){
+bool window_init_sdl(struct Window *a){
     // 初始化SDL
     if (SDL_Init(SDL_FLAGS) < 0) {
         fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());

@@ -6,7 +6,7 @@
 
 
  
-struct Application {
+struct Window {
     // SDL窗口
     SDL_Window *window;
     // SDL渲染器
@@ -25,9 +25,9 @@ struct Application {
 
 };
 
-bool app_new(struct Application **app);
-void app_free(struct Application **app);
-void app_run(struct Application *a);
+bool window_new(struct Window **window);
+void window_free(struct Window **window);
+void window_run(struct Window *w);
 
 
 #endif  //WINDOW_H

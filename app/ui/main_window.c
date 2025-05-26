@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 // 创建主窗口
-MainWindow* main_window_new(struct Application *app) {
+MainWindow* main_window_new(struct Window *app) {
     if (!app) {
         return NULL;
     }

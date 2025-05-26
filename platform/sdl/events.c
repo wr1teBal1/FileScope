@@ -11,24 +11,24 @@
 
 
 
-void app_events(struct Application *a) {
+void window_events(struct Window *w) {
         // 处理事件
-    while (SDL_PollEvent(&a->event)) {
-        switch (a->event.type) {
+    while (SDL_PollEvent(&w->event)) {
+        switch (w->event.type) {
             case SDL_EVENT_QUIT:
-                a->is_running = false;
+                w->is_running = false;
                 break;
             case SDL_EVENT_KEY_DOWN:
-                switch (a->event.key.scancode) {
+                switch (w->event.key.scancode) {
                     case SDL_SCANCODE_ESCAPE:
-                        a->is_running = false;
+                        w->is_running = false;
                         break;
                     default: 
                         break;
                 }
                 break;
             case SDL_EVENT_WINDOW_CLOSE:
-                a->is_running = false;
+                w->is_running = false;
                 break;
 
             default:

@@ -24,8 +24,8 @@
 #define FILE_ICON_PATH "images/file.png"
 
 // 创建文件列表视图
-FileListView* file_list_view_new(struct Application *app) {
-    if (!app) {
+FileListView* file_list_view_new(struct Window *window) {
+    if (!window) {
         return NULL;
     }
 
@@ -35,7 +35,7 @@ FileListView* file_list_view_new(struct Application *app) {
     }
 
     // 初始化成员
-    view->app = app;
+    view->window = window;
     view->files = file_list_new();
     if (!view->files) {
         free(view);
@@ -103,21 +103,21 @@ bool file_list_view_load_directory(FileListView *view, const char *path) {
 
 // 加载图标
 bool file_list_view_load_icons(FileListView *view) {
-    if (!view || !view->app || !view->app->renderer) {
+    if (!view || !view->window || !view->window->renderer) {
         return false;
     }
 
     // 加载文件夹图标
     SDL_Surface *folder_surface = IMG_Load(FOLDER_ICON_PATH);
     if (folder_surface) {
-        view->folder_icon = SDL_CreateTextureFromSurface(view->app->renderer, folder_surface);
+        view->folder_icon = SDL_CreateTextureFromSurface(view->window->renderer, folder_surface);
         SDL_DestroySurface(folder_surface);
     } else {
         // 创建默认文件夹图标（蓝色矩形）
         SDL_Surface *default_folder = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
         if (default_folder) {
-            SDL_FillSurfaceRect(default_folder, NULL, SDL_MapRGBA(default_folder->format, 50, 120, 200, 255));
-            view->folder_icon = SDL_CreateTextureFromSurface(view->app->renderer, default_folder);
+            SDL_FillSurfaceRect(default_folder, NULL, SDL_MapRGBA(default_folder->format, 50, 120, 200, 255,255));
+            view->folder_icon = SDL_CreateTextureFromSurface(view->window->renderer, default_folder);
             SDL_DestroySurface(default_folder);
         }
     }
@@ -125,14 +125,14 @@ bool file_list_view_load_icons(FileListView *view) {
     // 加载文件图标
     SDL_Surface *file_surface = IMG_Load(FILE_ICON_PATH);
     if (file_surface) {
-        view->file_icon = SDL_CreateTextureFromSurface(view->app->renderer, file_surface);
+        view->file_icon = SDL_CreateTextureFromSurface(view->window->renderer, file_surface);
         SDL_DestroySurface(file_surface);
     } else {
         // 创建默认文件图标（白色矩形）
         SDL_Surface *default_file = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
         if (default_file) {
-            SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file->format, 220, 220, 220, 255));
-            view->file_icon = SDL_CreateTextureFromSurface(view->app->renderer, default_file);
+            SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file->format, 220, 220, 220, 255,255));
+            view->file_icon = SDL_CreateTextureFromSurface(view->window->renderer, default_file);
             SDL_DestroySurface(default_file);
         }
     }
@@ -213,12 +213,12 @@ void file_list_view_refresh(FileListView *view) {
 
 // 绘制文件列表
 void file_list_view_draw(FileListView *view) {
-    if (!view || !view->app || !view->app->renderer || !view->files) {
+    if (!view || !view->window || !view->window->renderer || !view->files) {
         return;
     }
 
-    SDL_Renderer *renderer = view->app->renderer;
-    TTF_Font *font = view->app->font;
+    SDL_Renderer *renderer = view->window->renderer;
+    TTF_Font *font = view->window->font;
     
     // 设置裁剪区域（视口）
     SDL_RenderSetClipRect(renderer, &view->viewport);

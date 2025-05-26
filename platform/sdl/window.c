@@ -15,9 +15,9 @@
 
 
 // 释放SDL资源
-void app_free(struct Application **app) {
+void window_free(struct Window **app) {
     if (*app){
-        struct Application *a = *app;
+        struct Window *a = *app;
         // 释放SDL文字纹理
         if (a->text_image) {
             SDL_DestroyTexture(a->text_image);
@@ -40,7 +40,7 @@ void app_free(struct Application **app) {
         }
         // 释放SDL窗口
         if (a->window) {
-            SDL_DestroyWindow(app->window);
+            SDL_DestroyWindow(a->window);
             a->window = NULL;
         }
         TTF_Quit();
@@ -56,15 +56,15 @@ void app_free(struct Application **app) {
     }
 }
 
-bool app_new(struct Application **app) {
-    *app = calloc(1,sizeof(struct Application));//
+bool app_new(struct Window **app) {
+    *app = calloc(1,sizeof(struct Window));//
 
     if (*app == NULL)
     {
         fprintf(stderr,"ERROR calloc of new app\n");
         return false;
     }
-    struct Application *a = *app;
+    struct Window *a = *app;
 
     // 初始化应用程序
     if (!app_init_sdl(a)){
@@ -82,13 +82,13 @@ bool app_new(struct Application **app) {
 }
 
 //run
-void app_run(struct Application *a)
+void window_run(struct Window *a)
 {
     while (a->is_running){
         // 处理事件
-        app_events(app);
+        app_events(a);
         // 绘制
-        app_draw(app);
+        app_draw(a);
         // 延时
         SDL_Delay(16);
 

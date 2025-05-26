@@ -10,7 +10,7 @@
 
 
 
-void app_draw(struct Application *a) {
+void app_draw(struct Window *a) {
     // 清除渲染器
      SDL_RenderClear(a->renderer);
 
@@ -23,7 +23,7 @@ void app_draw(struct Application *a) {
     SDL_RenderPresent(a->renderer);
 }
 
-bool app_load_media(struct Application *a) {
+bool app_load_media(struct Window *a) {
     // 加载纹理 
     a->background = IMG_LoadTexture(a->renderer, "images/事例.png");//贴图2 
     if (!a->background) { 
@@ -39,7 +39,7 @@ bool app_load_media(struct Application *a) {
     return true;  
 }
  
-bool ttf_show(struct Application *a,string str,SDL_Color color){
+bool ttf_show(struct Window *a,const char str,SDL_Color color){
     SDL_Surface *surf = TTF_RenderText_Blended(a->font, str.c_str(),0, color);
     if (!surf) {
         fprintf(stderr, "Unable to create surface: %s\n", TTF_GetError());

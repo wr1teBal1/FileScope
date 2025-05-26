@@ -3,6 +3,6 @@
 
 #include "window.h"
 
-void app_events(struct Application *a);
+void window_events(struct Window *w);
 
 #endif  //EVENT_H

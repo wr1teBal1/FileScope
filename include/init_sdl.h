@@ -3,6 +3,6 @@
 
 #include "window.h"
 
-bool app_init_sdl(struct Application *a);
+bool window_init_sdl(struct Window *w);
 
 #endif  //INIT_SDL_H

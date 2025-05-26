@@ -23,7 +23,7 @@ typedef enum {
 
 // 文件列表视图结构
 typedef struct {
-    struct Application *app;    // 应用程序实例
+    struct Window *window;    // 应用程序实例
     FileList *files;            // 文件列表数据
     ViewMode view_mode;         // 视图模式
     SortMode sort_mode;         // 排序方式
@@ -38,7 +38,7 @@ typedef struct {
 } FileListView;
 
 // 创建文件列表视图
-FileListView* file_list_view_new(struct Application *app);
+FileListView* file_list_view_new(struct Window *window);
 
 // 释放文件列表视图
 void file_list_view_free(FileListView *view);
