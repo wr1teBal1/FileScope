@@ -6,7 +6,7 @@
 
 
  
-struct Window {
+typedef struct Window {
     // SDL窗口
     SDL_Window *window;
     // SDL渲染器
@@ -23,11 +23,11 @@ struct Window {
     bool is_running;
 
 
-};
+}Window;//quanuj
 
-bool window_new(struct Window **window);
-void window_free(struct Window **window);
-void window_run(struct Window *w);
+bool window_new( Window **window);//
+void window_free( Window **window);
+void window_run( Window *w);
 
 
 #endif  //WINDOW_H

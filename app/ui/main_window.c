@@ -14,8 +14,8 @@
 #include <stdlib.h>
 
 // 创建主窗口
-MainWindow* main_window_new(struct Window *app) {
-    if (!app) {
+MainWindow* main_window_new(Window *a) {
+    if (!a) {
         return NULL;
     }
 
@@ -24,10 +24,10 @@ MainWindow* main_window_new(struct Window *app) {
         return NULL;
     }
 
-    window->app = app;
+    window->app = a;
 
     // 创建文件列表视图
-    window->file_list_view = file_list_view_new(app);
+    window->file_list_view = file_list_view_new(a);
     if (!window->file_list_view) {
         free(window);
         return NULL;

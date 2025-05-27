@@ -13,10 +13,10 @@ struct Sidebar;
 
 // 主窗口结构体
 typedef struct MainWindow {
-    struct Window *app;                    // 应用程序窗口
-    struct FileListView *file_list_view;   // 文件列表视图
-    struct Toolbar *toolbar;               // 工具栏
-    struct Sidebar *sidebar;               // 侧边栏
+    Window *app;                    // 应用程序窗口
+    FileListView *file_list_view;   // 文件列表视图
+//    Toolbar *toolbar;               // 工具栏
+//    Sidebar *sidebar;               // 侧边栏
 } MainWindow;
 
 // 主窗口函数声明

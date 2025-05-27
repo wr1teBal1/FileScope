@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <pwd.h>
+// #include <pwd.h>
 
 // 当前错误码
 static FSError last_error = FS_ERROR_NONE;
@@ -326,8 +326,8 @@ bool fs_create_directory(const char *path) {
         return false;
     }
 
-    // 创建目录，权限设置为 0755 (rwxr-xr-x)
-    if (mkdir(path, 0755) != 0) {
+    // 创建目录
+    if (mkdir(path) != 0) {
         fs_set_error_from_errno();
         return false;
     }
@@ -579,19 +579,19 @@ char* fs_combine_path(const char *path1, const char *path2) {
 
 // 获取绝对路径
 char* fs_get_absolute_path(const char *path) {
-    if (!path) {
-        fs_set_error(FS_ERROR_INVALID_NAME);
-        return NULL;
-    }
+    // if (!path) {
+    //     fs_set_error(FS_ERROR_INVALID_NAME);
+    //     return NULL;
+    // }
 
-    char *abs_path = realpath(path, NULL);
-    if (!abs_path) {
-        fs_set_error_from_errno();
+    // char *abs_path = realpath(path, NULL);
+    // if (!abs_path) {
+    //     fs_set_error_from_errno();
         return NULL;
-    }
+    // }
 
-    fs_set_error(FS_ERROR_NONE);
-    return abs_path;
+    // fs_set_error(FS_ERROR_NONE);
+    // return abs_path;
 }
 
 // 获取相对路径

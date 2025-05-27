@@ -6,6 +6,8 @@
 #include "event.h"
 #include "file_system.h"
 
+#include <SDL3/SDL_main.h>
+
 int main(int argc, char* argv[]) {
     bool exit_status = EXIT_FAILURE;
     struct Window *window = NULL;
