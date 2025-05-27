@@ -637,7 +637,7 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                         }
                         item = item->next;
                     }
-                    
+                    s
                     // 点击空白区域，取消选择
                     file_list_view_select_item(view, -1);
                     return true;

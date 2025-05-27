@@ -5,6 +5,7 @@
  * 2. 提供文件和目录操作接口
  * 3. 处理文件系统错误
  * 4. 管理文件系统权限
+ *  1. 处理文件操作（复制、剪切、粘贴、删除、重命名）
  */
 
 #include "file_system.h"
@@ -112,7 +113,7 @@ bool fs_set_current_directory(const char *path) {
         return false;
     }
 
-    if (chdir(path) != 0) {
+    if (chdir(path) != 0) {// 逻辑
         fs_set_error_from_errno();
         return false;
     }
@@ -128,11 +129,11 @@ char* fs_get_home_directory(void) {
         return strdup(home);
     }
 
-    // 如果环境变量不可用，尝试从密码数据库获取
-    struct passwd *pw = getpwuid(getuid());
-    if (pw && pw->pw_dir) {
-        return strdup(pw->pw_dir);
-    }
+    // // 如果环境变量不可用，尝试从密码数据库获取
+    // struct passwd *pw = getpwuid(getuid());
+    // if (pw && pw->pw_dir) {
+    //     return strdup(pw->pw_dir);
+    // }
 
     fs_set_error(FS_ERROR_UNKNOWN);
     return NULL;
@@ -144,7 +145,7 @@ bool fs_path_exists(const char *path) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return false;
     }
-
+    //
     struct stat st;
     if (stat(path, &st) == 0) {
         fs_set_error(FS_ERROR_NONE);

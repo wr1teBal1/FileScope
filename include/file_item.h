@@ -9,12 +9,12 @@
 // 文件类型枚举
 typedef enum {
     FILE_TYPE_UNKNOWN,
-    FILE_TYPE_REGULAR,
-    FILE_TYPE_DIRECTORY,
-    FILE_TYPE_SYMLINK,
-    FILE_TYPE_DEVICE,
-    FILE_TYPE_PIPE,
-    FILE_TYPE_SOCKET
+    FILE_TYPE_REGULAR,// 普通文件
+    FILE_TYPE_DIRECTORY,    // 目录
+    FILE_TYPE_SYMLINK,// 符号链接
+    FILE_TYPE_DEVICE,// 设备文件
+    FILE_TYPE_PIPE,// 管道文件
+    FILE_TYPE_SOCKET// 套接字文件
 } FileType;
 
 // 文件项数据结构
