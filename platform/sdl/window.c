@@ -81,17 +81,17 @@ bool window_new(struct Window **app) {
     return true;
 }
 
-//run
-void window_run(struct Window *a)
-{
-    while (a->is_running){
-        // 处理事件
-        window_events(a);
-        // 绘制
-        window_draw(a);
-        // 延时
-        SDL_Delay(16);
+// //run
+// void window_run(struct Window *a)
+// {
+//     while (a->is_running){
+//         // 处理事件
+//         window_events(a);
+//         // 绘制
+//         window_draw(a);
+//         // 延时
+//         SDL_Delay(16);
 
-    }
+//     }
 
-}
+// }

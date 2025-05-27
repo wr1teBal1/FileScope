@@ -35,10 +35,10 @@ bool window_init_sdl(struct Window *a){
     }  
     if (!SDL_SetWindowIcon(a->window, icon)) {
         fprintf(stderr, "Unable to set window icon: %s\n", SDL_GetError());
-        SDL_DESTROY_SURFACE(icon);
+        // SDL_DestroySurface(icon);
         return false;
     } 
-    SDL_DESTROY_SURFACE(icon);
+    // SDL_DestroySurface(icon);
  
     return true;
 }

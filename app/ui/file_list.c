@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <sys/syslimits.h>
+#include <limits.h>
 
 // 默认项目尺寸
 #define DEFAULT_ITEM_WIDTH 100

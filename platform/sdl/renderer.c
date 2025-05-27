@@ -42,11 +42,11 @@ bool window_load_media(struct Window *a) {
 bool ttf_show(struct Window *a,const char* str,SDL_Color color){
     SDL_Surface *surf = TTF_RenderText_Blended(a->font, str,0, color);
     if (!surf) {
-        fprintf(stderr, "Unable to create surface: %s\n", TTF_GetError());
+        fprintf(stderr, "Unable to create surface: %s\n", SDL_GetError());
         return false;
     }
     a->text_image = SDL_CreateTextureFromSurface(a->renderer, surf);
-    SDL_DESTROY_SURFACE(surf); 
+    // SDL_DestroySurface(surf); 
     surf = NULL;
     if (!a->text_image) {
         fprintf(stderr, "Unable to  create texture: %s\n", SDL_GetError());

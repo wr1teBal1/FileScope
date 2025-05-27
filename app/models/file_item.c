@@ -213,19 +213,19 @@ FileType get_file_type(const struct stat *st) {
         return FILE_TYPE_UNKNOWN;
     }
 
-    if (S_ISREG(st->st_mode)) {
-        return FILE_TYPE_REGULAR;
-    } else if (S_ISDIR(st->st_mode)) {
-        return FILE_TYPE_DIRECTORY;
-    } else if (S_ISLNK(st->st_mode)) {
-        return FILE_TYPE_SYMLINK;
-    } else if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode)) {
-        return FILE_TYPE_DEVICE;
-    } else if (S_ISFIFO(st->st_mode)) {
-        return FILE_TYPE_PIPE;
-    } else if (S_ISSOCK(st->st_mode)) {
-        return FILE_TYPE_SOCKET;
-    }
+    // if (S_ISREG(st->st_mode)) {
+    //     return FILE_TYPE_REGULAR;
+    // } else if (S_ISDIR(st->st_mode)) {
+    //     return FILE_TYPE_DIRECTORY;
+    // } else if (S_ISLNK(st->st_mode)) {
+    //     return FILE_TYPE_SYMLINK;
+    // } else if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode)) {
+    //     return FILE_TYPE_DEVICE;
+    // } else if (S_ISFIFO(st->st_mode)) {
+    //     return FILE_TYPE_PIPE;
+    // } else if (S_ISSOCK(st->st_mode)) {
+    //     return FILE_TYPE_SOCKET;
+    // }
 
     return FILE_TYPE_UNKNOWN;
 }
