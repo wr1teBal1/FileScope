@@ -81,17 +81,10 @@ bool window_new(struct Window **app) {
     return true;
 }
 
-// //run
-// void window_run(struct Window *a)
-// {
-//     while (a->is_running){
-//         // 处理事件
-//         window_events(a);
-//         // 绘制
-//         window_draw(a);
-//         // 延时
-//         SDL_Delay(16);
+void window_run(struct Window *a)
+{
+    // 这个函数现在只是一个占位符，实际的主循环已移至app.c
+    // 保留此函数以维持向后兼容性
+    // 实际应用中应使用app.c中的app_run函数
 
-//     }
-
-// }
+}

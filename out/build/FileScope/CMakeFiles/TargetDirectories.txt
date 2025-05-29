@@ -1,3 +1,0 @@
-C:/Users/34572/Desktop/vscode/FileScope/out/build/FileScope/CMakeFiles/FileScope.dir
-C:/Users/34572/Desktop/vscode/FileScope/out/build/FileScope/CMakeFiles/edit_cache.dir
-C:/Users/34572/Desktop/vscode/FileScope/out/build/FileScope/CMakeFiles/rebuild_cache.dir

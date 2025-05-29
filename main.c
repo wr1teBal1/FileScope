@@ -5,6 +5,7 @@
 #include "renderer.h"
 #include "event.h"
 #include "file_system.h"
+#include "app.h" // 添加app.h头文件
 
 #include <SDL3/SDL_main.h>
 
@@ -20,13 +21,13 @@ int main(int argc, char* argv[]) {
         main_window = main_window_new(window);
         if (main_window) {
             // 获取起始目录
-            start_dir = (argc > 1) ? argv[1] : fs_get_current_directory();
+            start_dir = (argc > 1) ? argv[1] : fs_get_current_directory();// 从命令行参数获取起始目录
             if (start_dir) {
                 // 加载目录内容
                 if (main_window->file_list_view && 
                     file_list_view_load_directory(main_window->file_list_view, start_dir)) {
                     // 运行主循环
-                    window_run(window);
+                    app_run(window, main_window); // 使用新的app_run函数
                     exit_status = EXIT_SUCCESS;
                 }
                 if (argc <= 1) {

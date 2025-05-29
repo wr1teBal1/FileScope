@@ -117,9 +117,9 @@ bool file_list_view_load_icons(FileListView *view) {
         // 创建默认文件夹图标（蓝色矩形）
         SDL_Surface *default_folder = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
         if (default_folder) {
-            ///SDL_FillSurfaceRect(default_folder, NULL, SDL_MapRGBA(default_folder, 50, 120, 200, 255));
+            SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file,NULL, 220, 220, 255,255));
             view->folder_icon = SDL_CreateTextureFromSurface(view->window->renderer, default_folder);
-            //SDL_DestroySurface(default_folder);
+            SDL_DestroySurface(default_folder);
         }
     }
 
@@ -132,9 +132,9 @@ bool file_list_view_load_icons(FileListView *view) {
         // 创建默认文件图标（白色矩形）
         SDL_Surface *default_file = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
         if (default_file) {
-            //SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file, 220, 220, 255,255));
+            SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file,NULL, 220, 220, 255,255));
             view->file_icon = SDL_CreateTextureFromSurface(view->window->renderer, default_file);
-            //SDL_DestroySurface(default_file);
+            SDL_DestroySurface(default_file);
         }
     }
 
