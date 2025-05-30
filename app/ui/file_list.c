@@ -112,30 +112,20 @@ bool file_list_view_load_icons(FileListView *view) {
     SDL_Surface *folder_surface = IMG_Load(FOLDER_ICON_PATH);
     if (folder_surface) {
         view->folder_icon = SDL_CreateTextureFromSurface(view->window->renderer, folder_surface);
-        //(folder_surface);
+        SDL_DestroySurface(folder_surface);
     } else {
-        // 创建默认文件夹图标（蓝色矩形）
-        SDL_Surface *default_folder = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
-        if (default_folder) {
-            SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file,NULL, 220, 220, 255,255));
-            view->folder_icon = SDL_CreateTextureFromSurface(view->window->renderer, default_folder);
-            SDL_DestroySurface(default_folder);
-        }
+        printf("Warning: Failed to load folder icon from %s\n", FOLDER_ICON_PATH);
+        view->folder_icon = NULL;
     }
 
     // 加载文件图标
     SDL_Surface *file_surface = IMG_Load(FILE_ICON_PATH);
     if (file_surface) {
         view->file_icon = SDL_CreateTextureFromSurface(view->window->renderer, file_surface);
-        //(file_surface);
+        SDL_DestroySurface(file_surface);
     } else {
-        // 创建默认文件图标（白色矩形）
-        SDL_Surface *default_file = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
-        if (default_file) {
-            SDL_FillSurfaceRect(default_file, NULL, SDL_MapRGBA(default_file,NULL, 220, 220, 255,255));
-            view->file_icon = SDL_CreateTextureFromSurface(view->window->renderer, default_file);
-            SDL_DestroySurface(default_file);
-        }
+        printf("Warning: Failed to load file icon from %s\n", FILE_ICON_PATH);
+        view->file_icon = NULL;
     }
 
     return (view->folder_icon != NULL && view->file_icon != NULL);
@@ -221,12 +211,17 @@ void file_list_view_draw(FileListView *view) {
     SDL_Renderer *renderer = view->window->renderer;
     TTF_Font *font = view->window->font;
     
+    if (!font) {
+        return;
+    }
+    
     // 设置裁剪区域（视口）
-    //SDL_RenderSetClipRect(renderer, &view->viewport);
+    SDL_SetRenderClipRect(renderer, &view->viewport);
 
     // 绘制背景
     SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
-    //SDL_RenderFillRect(renderer, &(view->viewport));
+    SDL_FRect bg_rect = {view->viewport.x, view->viewport.y, view->viewport.w, view->viewport.h};
+    SDL_RenderFillRect(renderer, &bg_rect);
 
     // 如果列表为空
     if (!view->files->head) {
@@ -242,17 +237,17 @@ void file_list_view_draw(FileListView *view) {
                 text_rect.x = view->viewport.x + (view->viewport.w - text_rect.w) / 2;
                 text_rect.y = view->viewport.y + (view->viewport.h - text_rect.h) / 2;
                 
-                //SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
-                //SDL_DestroyTexture(text_texture);
+                SDL_FRect text_frect = {text_rect.x, text_rect.y, text_rect.w, text_rect.h};
+                SDL_RenderTexture(renderer, text_texture, NULL, &text_frect);
+                SDL_DestroyTexture(text_texture);
             }
-            //(text_surface);
+            SDL_DestroySurface(text_surface);
         }
         
         // 重置裁剪区域
-        //SDL_RenderSetClipRect(renderer, NULL);
+        SDL_SetRenderClipRect(renderer, NULL);
         return;
     }
-
     // 根据视图模式绘制文件列表
     if (view->view_mode == VIEW_MODE_ICONS) {
         // 图标视图
@@ -280,15 +275,16 @@ void file_list_view_draw(FileListView *view) {
                 // 绘制项目背景（如果被选中）
                 if (index == view->selected_index) {
                     SDL_SetRenderDrawColor(renderer, 200, 220, 255, 255);
-                    SDL_Rect select_rect = {x - 5, y - 5, view->item_width + 10, view->item_height + 10};
-  //                  SDL_RenderFillRect(renderer, &(select_rect));
+                    SDL_FRect select_rect = {x - 5, y - 5, view->item_width + 10, view->item_height + 10};
+                    SDL_RenderFillRect(renderer, &select_rect);
                 }
                 
                 // 绘制图标
                 SDL_Texture *icon = (item->type == FILE_TYPE_DIRECTORY) ? view->folder_icon : view->file_icon;
                 if (icon) {
                     SDL_Rect icon_rect = {x + (view->item_width - 32) / 2, y, 32, 32};
-                    //SDL_RenderCopy(renderer, icon, NULL, &icon_rect);
+                    SDL_FRect icon_frect = {icon_rect.x, icon_rect.y, icon_rect.w, icon_rect.h};
+                    SDL_RenderTexture(renderer, icon, NULL, &icon_frect);
                 }
                 
                 // 绘制文件名
@@ -303,10 +299,11 @@ void file_list_view_draw(FileListView *view) {
                         text_rect.x = x + (view->item_width - text_rect.w) / 2;
                         text_rect.y = y + 40;
                         
-                        //SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
-                        //SDL_DestroyTexture(text_texture);
+                        SDL_FRect text_frect = {text_rect.x, text_rect.y, text_rect.w, text_rect.h};
+                        SDL_RenderTexture(renderer, text_texture, NULL, &text_frect);
+                        SDL_DestroyTexture(text_texture);
                     }
-                    //SDL_DestroySurface(text_surface);
+                    SDL_DestroySurface(text_surface);
                 }
             }
             
@@ -333,15 +330,16 @@ void file_list_view_draw(FileListView *view) {
                 // 绘制项目背景（如果被选中）
                 if (index == view->selected_index) {
                     SDL_SetRenderDrawColor(renderer, 200, 220, 255, 255);
-                    SDL_Rect select_rect = {view->viewport.x + 5, y, view->viewport.w - 10, view->item_height};
-                    //SDL_RenderFillRect(renderer, &select_rect);
+                    SDL_FRect select_rect = {view->viewport.x + 5, y, view->viewport.w - 10, view->item_height};
+                    SDL_RenderFillRect(renderer, &select_rect);
                 }
                 
                 // 绘制图标
                 SDL_Texture *icon = (item->type == FILE_TYPE_DIRECTORY) ? view->folder_icon : view->file_icon;
                 if (icon) {
                     SDL_Rect icon_rect = {view->viewport.x + 10, y + (view->item_height - 16) / 2, 16, 16};
-                    //SDL_RenderCopy(renderer, icon, NULL, &icon_rect);
+                    SDL_FRect icon_frect = {icon_rect.x, icon_rect.y, icon_rect.w, icon_rect.h};
+                    SDL_RenderTexture(renderer, icon, NULL, &icon_frect);
                 }
                 
                 // 绘制文件名
@@ -356,10 +354,11 @@ void file_list_view_draw(FileListView *view) {
                         text_rect.x = view->viewport.x + 35;
                         text_rect.y = y + (view->item_height - text_rect.h) / 2;
                         
-                        //SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
-                        //SDL_DestroyTexture(text_texture);
+                        SDL_FRect text_frect = {text_rect.x, text_rect.y, text_rect.w, text_rect.h};
+                        SDL_RenderTexture(renderer, text_texture, NULL, &text_frect);
+                        SDL_DestroyTexture(text_texture);
                     }
-                    //SDL_DestroySurface(text_surface);
+                    SDL_DestroySurface(text_surface);
                 }
                 
                 // 如果是详细信息视图，绘制额外信息
@@ -379,10 +378,11 @@ void file_list_view_draw(FileListView *view) {
                             size_rect.x = view->viewport.x + 300;
                             size_rect.y = y + (view->item_height - size_rect.h) / 2;
                             
-                            //SDL_RenderCopy(renderer, size_texture, NULL, &size_rect);
-                            //SDL_DestroyTexture(size_texture);
+                            SDL_FRect size_frect = {size_rect.x, size_rect.y, size_rect.w, size_rect.h};
+                            SDL_RenderTexture(renderer, size_texture, NULL, &size_frect);
+                            SDL_DestroyTexture(size_texture);
                         }
-                        //SDL_DestroySurface(size_surface);
+                        SDL_DestroySurface(size_surface);
                     }
                     
                     // 绘制修改日期
@@ -399,10 +399,11 @@ void file_list_view_draw(FileListView *view) {
                             time_rect.x = view->viewport.x + 450;
                             time_rect.y = y + (view->item_height - time_rect.h) / 2;
                             
-                            //SDL_RenderCopy(renderer, time_texture, NULL, &time_rect);
-                            //SDL_DestroyTexture(time_texture);
+                            SDL_FRect time_frect = {time_rect.x, time_rect.y, time_rect.w, time_rect.h};
+                            SDL_RenderTexture(renderer, time_texture, NULL, &time_frect);
+                            SDL_DestroyTexture(time_texture);
                         }
-                        //SDL_DestroySurface(time_surface);
+                        SDL_DestroySurface(time_surface);
                     }
                 }
             }
@@ -415,7 +416,7 @@ void file_list_view_draw(FileListView *view) {
     }
     
     // 重置裁剪区域
-   // SDL_RenderSetClipRect(renderer, NULL);
+    SDL_SetRenderClipRect(renderer, NULL);
 }
 
 // 选择文件项
@@ -481,8 +482,14 @@ void file_list_view_open_selected(FileListView *view) {
     }
     
     if (selected->type == FILE_TYPE_DIRECTORY) {
-        // 打开目录
-        file_list_view_load_directory(view, selected->path);
+        // 检查是否是返回上级目录的项目
+        if (strcmp(selected->name, "..") == 0) {
+            // 返回上级目录
+            file_list_view_go_up(view);
+        } else {
+            // 打开目录
+            file_list_view_load_directory(view, selected->path);
+        }
     } else {
         // 打开文件（这里可以根据文件类型调用不同的处理函数）
         printf("打开文件: %s\n", selected->path);
@@ -645,43 +652,42 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
             break;
         }
         
-    //     case SDL_EVENT_KEY_DOWN: {
-    //         // 键盘事件
-    //         switch (event->key.sym) {
-    //             case SDLK_UP:
-    //                 if (view->selected_index > 0) {
-    //                     file_list_view_select_item(view, view->selected_index - 1);
-    //                 }
-    //                 return true;
+        case SDL_EVENT_KEY_DOWN: {
+            // 键盘事件
+            switch (event->key.scancode) {
+                case SDL_SCANCODE_UP:
+                    if (view->selected_index > 0) {
+                        file_list_view_select_item(view, view->selected_index - 1);
+                    }
+                    return true;
                     
-    //             case SDLK_DOWN: {
-    //                 int visible_count = 0;
-    //                 FileItem *item = view->files->head;
-    //                 while (item) {
-    //                     if (!item->is_hidden || view->show_hidden) {
-    //                         visible_count++;
-    //                     }
-    //                     item = item->next;
-    //                 }
+                case SDL_SCANCODE_DOWN: {
+                    int visible_count = 0;
+                    FileItem *item = view->files->head;
+                    while (item) {
+                        if (!item->is_hidden || view->show_hidden) {
+                            visible_count++;
+                        }
+                        item = item->next;
+                    }
                     
-    //                 if (view->selected_index < visible_count - 1) {
-    //                     file_list_view_select_item(view, view->selected_index + 1);
-    //                 }
-    //                 return true;
-    //             }
+                    if (view->selected_index < visible_count - 1) {
+                        file_list_view_select_item(view, view->selected_index + 1);
+                    }
+                    return true;
+                }
                 
-    //             case SDLK_RETURN:
-    //                 file_list_view_open_selected(view);
-    //                 return true;
+                case SDL_SCANCODE_RETURN:
+                    file_list_view_open_selected(view);
+                    return true;
                     
-    //             case SDLK_BACKSPACE:
-    //                 file_list_view_go_up(view);
-    //                 return true;
-    //         }
-    //         break;
-    //     }
-    // }
+                case SDL_SCANCODE_BACKSPACE:
+                    file_list_view_go_up(view);
+                    return true;
+            }
+            break;
+        }
+    }
     
     return false;
-    }
 }

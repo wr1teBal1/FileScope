@@ -143,6 +143,26 @@ bool file_list_load_directory(FileList *list, const char *dir_path) {
         return false;
     }
 
+    // 添加返回上级目录的项目（除非是根目录）
+    size_t dir_len = strlen(dir_path);
+    bool is_root = (dir_len == 1 && dir_path[0] == '/') || 
+                   (dir_len == 3 && dir_path[1] == ':' && dir_path[2] == '\\') ||
+                   (dir_len == 2 && dir_path[1] == ':');
+    
+    if (!is_root) {
+        FileItem *parent_item = (FileItem*)calloc(1, sizeof(FileItem));
+        if (parent_item) {
+            parent_item->name = strdup("..");
+            parent_item->display_name = strdup("../");
+            parent_item->path = strdup(dir_path); // 临时使用当前路径，实际处理在打开时
+            parent_item->type = FILE_TYPE_DIRECTORY;
+            parent_item->size = 0;
+            parent_item->is_hidden = false;
+            parent_item->next = NULL;
+            file_list_add_item(list, parent_item);
+        }
+    }
+
     // 读取目录内容
     struct dirent *entry;
     while ((entry = fs_read_directory(dir)) != NULL) {
@@ -214,19 +234,29 @@ FileType get_file_type(const struct stat *st) {
         return FILE_TYPE_UNKNOWN;
     }
 
-    // if (S_ISREG(st->st_mode)) {
-    //     return FILE_TYPE_REGULAR;
-    // } else if (S_ISDIR(st->st_mode)) {
-    //     return FILE_TYPE_DIRECTORY;
-    // } else if (S_ISLNK(st->st_mode)) {
-    //     return FILE_TYPE_SYMLINK;
-    // } else if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode)) {
-    //     return FILE_TYPE_DEVICE;
-    // } else if (S_ISFIFO(st->st_mode)) {
-    //     return FILE_TYPE_PIPE;
-    // } else if (S_ISSOCK(st->st_mode)) {
-    //     return FILE_TYPE_SOCKET;
-    // }
+#ifdef _WIN32
+    // Windows下的文件类型检查
+    if (st->st_mode & _S_IFDIR) {
+        return FILE_TYPE_DIRECTORY;
+    } else if (st->st_mode & _S_IFREG) {
+        return FILE_TYPE_REGULAR;
+    }
+#else
+    // Unix/Linux下的文件类型检查
+    if (S_ISREG(st->st_mode)) {
+        return FILE_TYPE_REGULAR;
+    } else if (S_ISDIR(st->st_mode)) {
+        return FILE_TYPE_DIRECTORY;
+    } else if (S_ISLNK(st->st_mode)) {
+        return FILE_TYPE_SYMLINK;
+    } else if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode)) {
+        return FILE_TYPE_DEVICE;
+    } else if (S_ISFIFO(st->st_mode)) {
+        return FILE_TYPE_PIPE;
+    } else if (S_ISSOCK(st->st_mode)) {
+        return FILE_TYPE_SOCKET;
+    }
+#endif
 
     return FILE_TYPE_UNKNOWN;
 }

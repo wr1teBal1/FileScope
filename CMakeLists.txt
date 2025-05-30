@@ -10,6 +10,7 @@ add_executable(FileScope
     app/ui/main_window.c
     app/ui/sidebar.c
     app/ui/toolbar.c
+    app/app.c
     engine/cache/thumbnail.c
     engine/filesystem/file_system.c
     engine/filesystem/file_watcher.c

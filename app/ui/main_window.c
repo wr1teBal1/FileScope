@@ -89,7 +89,7 @@ void main_window_draw(MainWindow *window) {
     if (!window || !window->app || !window->app->renderer) {
         return;
     }
-
+    
     // 绘制文件列表视图
     file_list_view_draw(window->file_list_view);
 
