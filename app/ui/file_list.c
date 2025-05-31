@@ -18,6 +18,12 @@
 #include <limits.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <shellapi.h>
+#ifndef PATH_MAX
+#define PATH_MAX 260  // Windows默认最大路径长度
+#endif
+#else
+#include <unistd.h>
 #endif
 
 // 默认项目尺寸
@@ -504,9 +510,31 @@ void file_list_view_open_selected(FileListView *view) {
             }
         }
     } else {
-        // 打开文件（这里可以根据文件类型调用不同的处理函数）
-        printf("打开文件: %s\n", selected->path);
-        // TODO: 实现文件打开功能
+        // 打开文件
+#ifdef _WIN32
+        // Windows平台：使用ShellExecute
+        HINSTANCE result = ShellExecute(NULL, "open", selected->path, NULL, NULL, SW_SHOWNORMAL);
+        
+        if ((intptr_t)result <= 32) {
+            // 如果ShellExecute失败，尝试使用SDL_OpenURL作为备用
+            char file_url[PATH_MAX + 8];
+            snprintf(file_url, sizeof(file_url), "file:///%s", selected->path);
+            
+            // 将反斜杠转换为正斜杠
+            for (char *p = file_url + 8; *p; p++) {
+                if (*p == '\\') {
+                    *p = '/';
+                }
+            }
+            
+            SDL_OpenURL(file_url);
+        }
+#else
+        // 其他平台：使用SDL_OpenURL
+        char file_url[PATH_MAX + 8];
+        snprintf(file_url, sizeof(file_url), "file://%s", selected->path);
+        SDL_OpenURL(file_url);
+#endif
     }
 }
 
