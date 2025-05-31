@@ -143,17 +143,19 @@ bool file_list_load_directory(FileList *list, const char *dir_path) {
         return false;
     }
 
-    // 添加返回上级目录的项目（除非是根目录）
+    // 添加返回上级目录的项目（除非是驱动器列表）
     size_t dir_len = strlen(dir_path);
-    bool is_root = (dir_len == 1 && dir_path[0] == '/') || 
-                   (dir_len == 3 && dir_path[1] == ':' && dir_path[2] == '\\') ||
-                   (dir_len == 2 && dir_path[1] == ':');
+    bool is_root = (strcmp(dir_path, "[Drives]") == 0);
+    
+    // 调试输出
+    printf("[DEBUG] Loading directory: %s, length: %zu, is_root: %s\n", 
+           dir_path, dir_len, is_root ? "true" : "false");
     
     if (!is_root) {
         FileItem *parent_item = (FileItem*)calloc(1, sizeof(FileItem));
         if (parent_item) {
             parent_item->name = strdup("..");
-            parent_item->display_name = strdup("../");
+            parent_item->display_name = strdup("..");
             parent_item->path = strdup(dir_path); // 临时使用当前路径，实际处理在打开时
             parent_item->type = FILE_TYPE_DIRECTORY;
             parent_item->size = 0;

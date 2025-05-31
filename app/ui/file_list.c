@@ -9,11 +9,16 @@
  */
 
 #include "file_list.h"
+#include "file_item.h"
 #include "renderer.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#include <math.h>
 #include <limits.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // 默认项目尺寸
 #define DEFAULT_ITEM_WIDTH 100
@@ -487,8 +492,16 @@ void file_list_view_open_selected(FileListView *view) {
             // 返回上级目录
             file_list_view_go_up(view);
         } else {
-            // 打开目录
-            file_list_view_load_directory(view, selected->path);
+            // 检查当前是否在驱动器列表中
+            if (view->files->current_dir && strcmp(view->files->current_dir, "[Drives]") == 0) {
+                // 从驱动器列表进入驱动器，确保路径正确
+                char drive_root[4];
+                sprintf(drive_root, "%s\\", selected->name);
+                file_list_view_load_directory(view, drive_root);
+            } else {
+                // 如果是目录或驱动器，进入该目录
+                file_list_view_load_directory(view, selected->path);
+            }
         }
     } else {
         // 打开文件（这里可以根据文件类型调用不同的处理函数）
@@ -507,10 +520,19 @@ void file_list_view_go_up(FileListView *view) {
     char parent_dir[PATH_MAX];
     strcpy(parent_dir, view->files->current_dir);
     
-    // 移除末尾的路径分隔符（如果有）
+    // 检查是否已经在驱动器根目录（如 "E:\\"）
     size_t len = strlen(parent_dir);
+    if ((len == 3 && parent_dir[1] == ':' && parent_dir[2] == '\\') ||
+        (len == 2 && parent_dir[1] == ':')) {
+        // 已经是驱动器根目录，显示所有驱动器
+        file_list_view_load_drives(view);
+        return;
+    }
+    
+    // 移除末尾的路径分隔符（如果有）
     if (len > 1 && (parent_dir[len-1] == '/' || parent_dir[len-1] == '\\')) {
         parent_dir[len-1] = '\0';
+        len--; // 更新长度
     }
     
     // 查找最后一个路径分隔符
@@ -527,8 +549,22 @@ void file_list_view_go_up(FileListView *view) {
             *last_sep = '\0';
         }
         
+        // 检查截取后是否为驱动器根目录（Windows）
+        size_t new_len = strlen(parent_dir);
+        if (new_len == 2 && parent_dir[1] == ':') {
+            // 已经是驱动器根目录（如 "C:"），添加反斜杠并加载
+            strcat(parent_dir, "\\");
+            file_list_view_load_directory(view, parent_dir);
+            return;
+        }
+        
         // 加载上级目录
         file_list_view_load_directory(view, parent_dir);
+    } else {
+        // 没有路径分隔符，显示所有驱动器
+#ifdef _WIN32
+        file_list_view_load_drives(view);
+#endif
     }
 }
 
@@ -580,6 +616,83 @@ void file_list_view_scroll(FileListView *view, int delta) {
     } else if (max_scroll > 0 && view->scroll_offset_y > max_scroll) {
         view->scroll_offset_y = max_scroll;
     }
+}
+
+// 加载Windows驱动器列表
+void file_list_view_load_drives(FileListView *view) {
+    if (!view || !view->files) {
+        return;
+    }
+    
+#ifdef _WIN32
+    // 清空当前列表
+    file_list_clear(view->files);
+    
+    // 设置当前目录为驱动器列表标识
+    if (view->files->current_dir) {
+        free(view->files->current_dir);
+    }
+    view->files->current_dir = strdup("[Drives]");
+    
+    // 获取所有逻辑驱动器
+    DWORD drives = GetLogicalDrives();
+    
+    for (int i = 0; i < 26; i++) {
+        if (drives & (1 << i)) {
+            char drive_letter = 'A' + i;
+            char drive_path[4];
+            sprintf(drive_path, "%c:\\", drive_letter);
+            
+            // 检查驱动器类型
+            UINT drive_type = GetDriveType(drive_path);
+            if (drive_type == DRIVE_NO_ROOT_DIR) {
+                continue; // 跳过无效驱动器
+            }
+            
+            // 创建驱动器项目
+            FileItem *drive_item = (FileItem*)calloc(1, sizeof(FileItem));
+            if (drive_item) {
+                // 设置驱动器名称
+                char drive_name[32];
+                sprintf(drive_name, "%c:", drive_letter);
+                drive_item->name = strdup(drive_name);
+                
+                // 设置显示名称（包含驱动器类型）
+                char display_name[64];
+                const char *type_str = "";
+                switch (drive_type) {
+                    case DRIVE_FIXED:
+                        type_str = " (本地磁盘)";
+                        break;
+                    case DRIVE_REMOVABLE:
+                        type_str = " (可移动磁盘)";
+                        break;
+                    case DRIVE_REMOTE:
+                        type_str = " (网络驱动器)";
+                        break;
+                    case DRIVE_CDROM:
+                        type_str = " (光驱)";
+                        break;
+                    case DRIVE_RAMDISK:
+                        type_str = " (RAM磁盘)";
+                        break;
+                }
+                sprintf(display_name, "%c:%s", drive_letter, type_str);
+                drive_item->display_name = strdup(display_name);
+                
+                // 设置路径
+                drive_item->path = strdup(drive_path);
+                drive_item->type = FILE_TYPE_DIRECTORY;
+                drive_item->size = 0;
+                drive_item->is_hidden = false;
+                drive_item->next = NULL;
+                
+                // 添加到列表
+                file_list_add_item(view->files, drive_item);
+            }
+        }
+    }
+#endif
 }
 
 // 处理事件

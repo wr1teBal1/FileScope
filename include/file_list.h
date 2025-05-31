@@ -46,6 +46,9 @@ void file_list_view_free(FileListView *view);
 // 加载目录
 bool file_list_view_load_directory(FileListView *view, const char *path);
 
+// 加载驱动器列表
+void file_list_view_load_drives(FileListView *view);
+
 // 刷新文件列表
 void file_list_view_refresh(FileListView *view);
 

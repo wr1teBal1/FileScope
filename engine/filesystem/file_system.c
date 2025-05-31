@@ -477,16 +477,28 @@ const char* fs_get_filename(const char *path) {
         return NULL;
     }
 
-    // 查找最后一个路径分隔符
+    // 查找最后一个路径分隔符（支持Unix和Windows）
     const char *slash = strrchr(path, '/');
-    if (!slash) {
+    const char *backslash = strrchr(path, '\\');
+    
+    // 选择最后出现的分隔符
+    const char *last_sep = NULL;
+    if (slash && backslash) {
+        last_sep = (slash > backslash) ? slash : backslash;
+    } else if (slash) {
+        last_sep = slash;
+    } else if (backslash) {
+        last_sep = backslash;
+    }
+    
+    if (!last_sep) {
         // 没有路径分隔符，整个字符串就是文件名
         fs_set_error(FS_ERROR_NONE);
         return path;
     }
 
     fs_set_error(FS_ERROR_NONE);
-    return slash + 1;
+    return last_sep + 1;
 }
 
 // 获取文件名（不含扩展名）
@@ -524,6 +536,14 @@ const char* fs_get_directory(const char *path) {
 
     // 查找最后一个路径分隔符
     char *slash = strrchr(dirname, '/');
+#ifdef _WIN32
+    char *backslash = strrchr(dirname, '\\');
+    // 在Windows下，使用最后出现的分隔符（/ 或 \）
+    if (backslash && (!slash || backslash > slash)) {
+        slash = backslash;
+    }
+#endif
+    
     if (!slash) {
         // 没有路径分隔符，返回当前目录
         fs_set_error(FS_ERROR_NONE);
@@ -551,7 +571,7 @@ char* fs_combine_path(const char *path1, const char *path2) {
 
     size_t len1 = strlen(path1);
     size_t len2 = strlen(path2);
-    size_t len = len1 + len2 + 2; // +2 for '/' and '\0'
+    size_t len = len1 + len2 + 2; // +2 for separator and '\0'
 
     char *result = (char*)malloc(len);
     if (!result) {
@@ -561,17 +581,31 @@ char* fs_combine_path(const char *path1, const char *path2) {
 
     strcpy(result, path1);
 
-    // 确保路径1的末尾有一个斜杠
+#ifdef _WIN32
+    // Windows: 使用反斜杠作为路径分隔符
+    if (len1 > 0 && path1[len1 - 1] != '\\' && path1[len1 - 1] != '/') {
+        strcat(result, "\\");
+    }
+    
+    // 确保路径2的开头没有分隔符
+    if (path2[0] == '\\' || path2[0] == '/') {
+        strcat(result, path2 + 1);
+    } else {
+        strcat(result, path2);
+    }
+#else
+    // Unix/Linux: 使用正斜杠作为路径分隔符
     if (len1 > 0 && path1[len1 - 1] != '/') {
         strcat(result, "/");
     }
-
+    
     // 确保路径2的开头没有斜杠
     if (path2[0] == '/') {
         strcat(result, path2 + 1);
     } else {
         strcat(result, path2);
     }
+#endif
 
     fs_set_error(FS_ERROR_NONE);
     return result;
