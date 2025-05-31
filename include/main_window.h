@@ -4,17 +4,20 @@
 #include "main.h"
 #include "window.h"
 #include "file_list.h"
+#include "context_menu.h"
 
 // 前向声明
 struct Window;
 struct FileListView;
 struct Toolbar;
 struct Sidebar;
+struct ContextMenu;
 
 // 主窗口结构体
 typedef struct MainWindow {
     Window *app;                    // 应用程序窗口
     FileListView *file_list_view;   // 文件列表视图
+    ContextMenu *context_menu;      // 右键菜单
 //    Toolbar *toolbar;               // 工具栏
 //    Sidebar *sidebar;               // 侧边栏
 } MainWindow;

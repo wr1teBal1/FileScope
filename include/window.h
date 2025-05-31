@@ -21,7 +21,8 @@ typedef struct Window {
     SDL_Event event;
     // 是否关闭
     bool is_running;
-
+    // 用户数据指针
+    void *user_data;
 
 }Window;//quanuj
 

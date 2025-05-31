@@ -21,8 +21,15 @@ typedef enum {
     SORT_BY_DATE_MODIFIED  // 按修改日期排序
 } SortMode;
 
+// 前向声明
+struct FileListView;
+struct FileItem;
+
+// 右键点击回调函数类型
+typedef void (*RightClickCallback)(struct FileListView *view, int x, int y, struct FileItem *item);
+
 // 文件列表视图结构
-typedef struct {
+typedef struct FileListView {
     struct Window *window;    // 应用程序实例
     FileList *files;            // 文件列表数据
     ViewMode view_mode;         // 视图模式
@@ -35,6 +42,7 @@ typedef struct {
     SDL_Rect viewport;          // 视口区域
     SDL_Texture *folder_icon;   // 文件夹图标
     SDL_Texture *file_icon;     // 文件图标
+    RightClickCallback on_right_click; // 右键点击回调
 } FileListView;
 
 // 创建文件列表视图

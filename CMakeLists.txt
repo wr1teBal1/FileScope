@@ -8,6 +8,7 @@ add_executable(FileScope
     app/models/file_item.c
     app/ui/file_list.c
     app/ui/main_window.c
+    app/ui/context_menu.c
     app/ui/sidebar.c
     app/ui/toolbar.c
     app/app.c

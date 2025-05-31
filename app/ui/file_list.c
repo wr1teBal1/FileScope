@@ -739,56 +739,76 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
         
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
             // 鼠标点击事件
-            if (event->button.button == SDL_BUTTON_LEFT) {
-                int x = event->button.x;
-                int y = event->button.y;
+            int x = event->button.x;
+            int y = event->button.y;
+            
+            // 检查点击是否在视口内
+            if (x >= view->viewport.x && x < view->viewport.x + view->viewport.w &&
+                y >= view->viewport.y && y < view->viewport.y + view->viewport.h) {
                 
-                // 检查点击是否在视口内
-                if (x >= view->viewport.x && x < view->viewport.x + view->viewport.w &&
-                    y >= view->viewport.y && y < view->viewport.y + view->viewport.h) {
+                // 计算点击的项目
+                int clicked_index = -1;
+                
+                if (view->view_mode == VIEW_MODE_ICONS) {
+                    // 图标视图
+                    int items_per_row = (view->viewport.w - 20) / (view->item_width + 10);
+                    if (items_per_row < 1) items_per_row = 1;
                     
-                    // 计算点击的项目
-                    int clicked_index = -1;
+                    int row = (y - view->viewport.y + view->scroll_offset_y - 10) / (view->item_height + 10);
+                    int col = (x - view->viewport.x - 10) / (view->item_width + 10);
                     
-                    if (view->view_mode == VIEW_MODE_ICONS) {
-                        // 图标视图
-                        int items_per_row = (view->viewport.w - 20) / (view->item_width + 10);
-                        if (items_per_row < 1) items_per_row = 1;
-                        
-                        int row = (y - view->viewport.y + view->scroll_offset_y - 10) / (view->item_height + 10);
-                        int col = (x - view->viewport.x - 10) / (view->item_width + 10);
-                        
-                        if (col >= 0 && col < items_per_row) {
-                            clicked_index = row * items_per_row + col;
-                        }
-                    } else {
-                        // 列表视图或详细信息视图
-                        clicked_index = (y - view->viewport.y + view->scroll_offset_y - 5) / (view->item_height + 2);
+                    if (col >= 0 && col < items_per_row) {
+                        clicked_index = row * items_per_row + col;
                     }
-                    
-                    // 验证点击的索引是否有效
-                    int visible_count = 0;
-                    FileItem *item = view->files->head;
-                    while (item) {
-                        if (!item->is_hidden || view->show_hidden) {
-                            if (visible_count == clicked_index) {
+                } else {
+                    // 列表视图或详细信息视图
+                    clicked_index = (y - view->viewport.y + view->scroll_offset_y - 5) / (view->item_height + 2);
+                }
+                
+                // 验证点击的索引是否有效
+                int visible_count = 0;
+                FileItem *item = view->files->head;
+                while (item) {
+                    if (!item->is_hidden || view->show_hidden) {
+                        if (visible_count == clicked_index) {
+                            // 处理左键和右键点击
+                            if (event->button.button == SDL_BUTTON_LEFT) {
                                 file_list_view_select_item(view, clicked_index);
                                 
                                 // 检查双击
                                 if (event->button.clicks == 2) {
                                     file_list_view_open_selected(view);
                                 }
-                                
-                                return true;
+                            } else if (event->button.button == SDL_BUTTON_RIGHT) {
+                                // 右键点击：选中项目并显示右键菜单
+                                file_list_view_select_item(view, clicked_index);
+                                if (view->on_right_click) {
+                                    view->on_right_click(view, x, y, item);
+                                }
+                                printf("右键点击文件: %s\n", item->display_name);
                             }
-                            visible_count++;
+                            
+                            return true;
                         }
-                        item = item->next;
+                        visible_count++;
                     }
-                    // 点击空白区域，取消选择)
-                    file_list_view_select_item(view, (-1));//
-                    return true;
+                    item = item->next;
                 }
+                
+                // 点击空白区域
+                if (event->button.button == SDL_BUTTON_LEFT) {
+                    // 左键点击空白区域，取消选择
+                    file_list_view_select_item(view, -1);
+                } else if (event->button.button == SDL_BUTTON_RIGHT) {
+                    // 右键点击空白区域，显示空白区域右键菜单
+                    file_list_view_select_item(view, -1);
+                    if (view->on_right_click) {
+                        view->on_right_click(view, x, y, NULL);
+                    }
+                    printf("右键点击空白区域\n");
+                }
+                
+                return true;
             }
             break;
         }
