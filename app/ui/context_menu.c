@@ -86,15 +86,15 @@ static void create_file_menu_items(ContextMenu *menu, FileItem *item) {
     }
     
     // 添加菜单项
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "打开", ACTION_OPEN, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Open", ACTION_OPEN, true));
     menu_add_item(menu, menu_item_new(MENU_ITEM_SEPARATOR, NULL, 0, false));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "复制", ACTION_COPY, true));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "剪切", ACTION_CUT, true));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "删除", ACTION_DELETE, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Copy", ACTION_COPY, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Cut", ACTION_CUT, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Delete", ACTION_DELETE, true));
     menu_add_item(menu, menu_item_new(MENU_ITEM_SEPARATOR, NULL, 0, false));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "重命名", ACTION_RENAME, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Rename", ACTION_RENAME, true));
     menu_add_item(menu, menu_item_new(MENU_ITEM_SEPARATOR, NULL, 0, false));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "属性", ACTION_PROPERTIES, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Properties", ACTION_PROPERTIES, true));
 }
 
 // 创建空白区域菜单
@@ -110,12 +110,12 @@ static void create_blank_menu_items(ContextMenu *menu) {
     }
     
     // 添加菜单项
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "粘贴", ACTION_PASTE, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Paste", ACTION_PASTE, true));
     menu_add_item(menu, menu_item_new(MENU_ITEM_SEPARATOR, NULL, 0, false));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "新建文件夹", ACTION_NEW_FOLDER, true));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "新建文件", ACTION_NEW_FILE, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "New Folder", ACTION_NEW_FOLDER, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "New File", ACTION_NEW_FILE, true));
     menu_add_item(menu, menu_item_new(MENU_ITEM_SEPARATOR, NULL, 0, false));
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "刷新", ACTION_REFRESH, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Refresh", ACTION_REFRESH, true));
 }
 
 // 计算菜单尺寸
@@ -372,57 +372,57 @@ void context_menu_execute_action(ContextMenu *menu, MenuAction action) {
     
     switch (action) {
         case ACTION_OPEN:
-            printf("执行动作: 打开\n");
+            printf("Executing action: Open\n");
             // TODO: 实现打开文件/文件夹功能
             break;
             
         case ACTION_COPY:
-            printf("执行动作: 复制\n");
+            printf("Executing action: Copy\n");
             // TODO: 实现复制功能
             break;
             
         case ACTION_CUT:
-            printf("执行动作: 剪切\n");
+            printf("Executing action: Cut\n");
             // TODO: 实现剪切功能
             break;
             
         case ACTION_PASTE:
-            printf("执行动作: 粘贴\n");
+            printf("Executing action: Paste\n");
             // TODO: 实现粘贴功能
             break;
             
         case ACTION_DELETE:
-            printf("执行动作: 删除\n");
+            printf("Executing action: Delete\n");
             // TODO: 实现删除功能
             break;
             
         case ACTION_RENAME:
-            printf("执行动作: 重命名\n");
+            printf("Executing action: Rename\n");
             // TODO: 实现重命名功能
             break;
             
         case ACTION_PROPERTIES:
-            printf("执行动作: 属性\n");
+            printf("Executing action: Properties\n");
             // TODO: 实现属性对话框
             break;
             
         case ACTION_NEW_FOLDER:
-            printf("执行动作: 新建文件夹\n");
+            printf("Executing action: New Folder\n");
             // TODO: 实现新建文件夹功能
             break;
             
         case ACTION_NEW_FILE:
-            printf("执行动作: 新建文件\n");
+            printf("Executing action: New File\n");
             // TODO: 实现新建文件功能
             break;
             
         case ACTION_REFRESH:
-            printf("执行动作: 刷新\n");
+            printf("Executing action: Refresh\n");
             // TODO: 实现刷新功能
             break;
             
         default:
-            printf("未知动作: %d\n", action);
+            printf("Unknown action: %d\n", action);
             break;
     }
 }

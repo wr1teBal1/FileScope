@@ -803,19 +803,19 @@ void file_list_view_load_drives(FileListView *view) {
                 const char *type_str = "";
                 switch (drive_type) {
                     case DRIVE_FIXED:
-                        type_str = " (本地磁盘)";
+                        type_str = " (Local Disk)";
                         break;
                     case DRIVE_REMOVABLE:
-                        type_str = " (可移动磁盘)";
+                        type_str = " (Removable Disk)";
                         break;
                     case DRIVE_REMOTE:
-                        type_str = " (网络驱动器)";
+                        type_str = " (Network Drive)";
                         break;
                     case DRIVE_CDROM:
-                        type_str = " (光驱)";
+                        type_str = " (CD-ROM)";
                         break;
                     case DRIVE_RAMDISK:
-                        type_str = " (RAM磁盘)";
+                        type_str = " (RAM Disk)";
                         break;
                 }
                 sprintf(display_name, "%c:%s", drive_letter, type_str);
