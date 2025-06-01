@@ -28,21 +28,26 @@ struct FileItem;
 // 右键点击回调函数类型
 typedef void (*RightClickCallback)(struct FileListView *view, int x, int y, struct FileItem *item);
 
+// 目录变更回调函数类型
+typedef void (*DirectoryChangedCallback)(struct FileListView *view, const char *path);
+
 // 文件列表视图结构
 typedef struct FileListView {
-    struct Window *window;    // 应用程序实例
-    FileList *files;            // 文件列表数据
-    ViewMode view_mode;         // 视图模式
-    SortMode sort_mode;         // 排序方式
-    bool show_hidden;           // 是否显示隐藏文件
-    int scroll_offset_y;        // 垂直滚动偏移
-    int item_width;             // 项目宽度
-    int item_height;            // 项目高度
-    int selected_index;         // 当前选中的索引
-    SDL_Rect viewport;          // 视口区域
-    SDL_Texture *folder_icon;   // 文件夹图标
-    SDL_Texture *file_icon;     // 文件图标
-    RightClickCallback on_right_click; // 右键点击回调
+    struct Window *window;       // 应用程序实例
+    FileList *files;             // 文件列表数据
+    char *current_path;          // 当前目录路径
+    ViewMode view_mode;          // 视图模式
+    SortMode sort_mode;          // 排序方式
+    bool show_hidden;            // 是否显示隐藏文件
+    int scroll_offset_y;         // 垂直滚动偏移
+    int item_width;              // 项目宽度
+    int item_height;             // 项目高度
+    int selected_index;          // 当前选中的索引
+    SDL_Rect viewport;           // 视口区域
+    SDL_Texture *folder_icon;    // 文件夹图标
+    SDL_Texture *file_icon;      // 文件图标
+    RightClickCallback on_right_click;                  // 右键点击回调
+    DirectoryChangedCallback on_directory_changed;      // 目录变更回调
 } FileListView;
 
 // 创建文件列表视图

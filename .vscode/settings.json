@@ -6,6 +6,17 @@
         "main.h": "c",
         "sdl.h": "c",
         "sdl_image.h": "c",
-        "sdl_main.h": "c"
+        "sdl_main.h": "c",
+        "event.h": "c",
+        "cstdlib": "c",
+        "toolbar.h": "c",
+        "typeinfo": "c",
+        "cstddef": "c",
+        "new": "c",
+        "type_traits": "c",
+        "main_window.h": "c",
+        "sdl_platform_defines.h": "c",
+        "math.h": "c",
+        "cmath": "c"
     }
 }

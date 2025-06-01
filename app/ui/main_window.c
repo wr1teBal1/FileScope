@@ -31,6 +31,18 @@ static void on_file_list_right_click(FileListView *view, int x, int y, FileItem 
     }
 }
 
+// 目录变更回调函数 - 连接FileListView和Toolbar
+static void on_directory_changed(FileListView *view, const char *path) {
+    // 获取主窗口实例
+    MainWindow *main_window = (MainWindow*)view->window->user_data;
+    if (!main_window || !main_window->toolbar) {
+        return;
+    }
+    
+    // 通知工具栏目录已更改
+    toolbar_notify_directory_changed(main_window->toolbar, path);
+}
+
 // 创建主窗口
 MainWindow* main_window_new(Window *a) {
     if (!a) {
@@ -59,21 +71,31 @@ MainWindow* main_window_new(Window *a) {
         return NULL;
     }
 
-    // TODO: 创建工具栏和侧边栏
-    // window->toolbar = toolbar_new(app);
+    // 创建工具栏
+    window->toolbar = toolbar_new(a);
+    if (!window->toolbar) {
+        context_menu_free(window->context_menu);
+        file_list_view_free(window->file_list_view);
+        free(window);
+        return NULL;
+    }
+
+    // TODO: 创建侧边栏
     // window->sidebar = sidebar_new(app);
 
     // 设置文件列表视图的视口区域
+    int toolbar_height = 40; // 工具栏高度
     window->file_list_view->viewport.x = 0;
-    window->file_list_view->viewport.y = 0; // TODO: 考虑工具栏高度
+    window->file_list_view->viewport.y = toolbar_height;
     window->file_list_view->viewport.w = SDL_WINDOW_WIDTH; // TODO: 考虑侧边栏宽度
-    window->file_list_view->viewport.h = SDL_WINDOW_HEIGHT; // TODO: 考虑工具栏高度
+    window->file_list_view->viewport.h = SDL_WINDOW_HEIGHT - toolbar_height;
 
     // 设置用户数据，用于回调函数中获取主窗口实例
     a->user_data = window;
     
-    // 设置右键点击回调
+    // 设置回调函数
     window->file_list_view->on_right_click = on_file_list_right_click;
+    window->file_list_view->on_directory_changed = on_directory_changed;
     
     // 加载默认目录
     file_list_view_load_directory(window->file_list_view, "."); // TODO: 加载用户主目录或上次打开的目录
@@ -94,8 +116,10 @@ void main_window_free(MainWindow *window) {
     if (window->context_menu) {
         context_menu_free(window->context_menu);
     }
-    // TODO: 释放工具栏和侧边栏
-    // if (window->toolbar) { toolbar_free(window->toolbar); }
+    if (window->toolbar) {
+        toolbar_free(window->toolbar);
+    }
+    // TODO: 释放侧边栏
     // if (window->sidebar) { sidebar_free(window->sidebar); }
 
     free(window);
@@ -112,13 +136,17 @@ bool main_window_handle_event(MainWindow *window, SDL_Event *event) {
         return true;
     }
 
+    // 处理工具栏事件
+    if (window->toolbar && toolbar_handle_event(window->toolbar, event)) {
+        return true;
+    }
+
     // 将事件传递给文件列表视图处理
     if (file_list_view_handle_event(window->file_list_view, event)) {
         return true;
     }
 
-    // TODO: 将事件传递给工具栏和侧边栏处理
-    // if (toolbar_handle_event(window->toolbar, event)) { return true; }
+    // TODO: 将事件传递给侧边栏处理
     // if (sidebar_handle_event(window->sidebar, event)) { return true; }
 
     return false;
@@ -133,8 +161,12 @@ void main_window_draw(MainWindow *window) {
     // 绘制文件列表视图
     file_list_view_draw(window->file_list_view);
 
-    // TODO: 绘制工具栏和侧边栏
-    // toolbar_draw(window->toolbar);
+    // 绘制工具栏
+    if (window->toolbar) {
+        toolbar_draw(window->toolbar);
+    }
+    
+    // TODO: 绘制侧边栏
     // sidebar_draw(window->sidebar);
 
     // 绘制右键菜单（最后绘制，确保在最上层）

@@ -35,6 +35,50 @@
 #define FOLDER_ICON_PATH "images/folder.png"
 #define FILE_ICON_PATH "images/file.png"
 
+// Helper functions for formatting file size and time
+static void format_file_size(uint64_t size, char *buffer, size_t buffer_size) {
+    const char *units[] = {"B", "KB", "MB", "GB", "TB"};
+    int unit_index = 0;
+    double size_value = (double)size;
+    
+    while (size_value >= 1024.0 && unit_index < 4) {
+        size_value /= 1024.0;
+        unit_index++;
+    }
+    
+    if (unit_index == 0) {
+        snprintf(buffer, buffer_size, "%d %s", (int)size_value, units[unit_index]);
+    } else {
+        snprintf(buffer, buffer_size, "%.2f %s", size_value, units[unit_index]);
+    }
+}
+
+static void format_time(time_t time_value, char *buffer, size_t buffer_size) {
+    struct tm *time_info = localtime(&time_value);
+    if (time_info) {
+        strftime(buffer, buffer_size, "%Y-%m-%d %H:%M", time_info);
+    } else {
+        strncpy(buffer, "Unknown", buffer_size - 1);
+        buffer[buffer_size - 1] = '\0';
+    }
+}
+
+// 目录变更回调函数类型 - 用于通知toolbar
+
+
+// toolbar会调用的函数:
+// 加载目录
+bool file_list_view_load_directory(FileListView *view, const char *path);
+
+// 返回上级目录
+void file_list_view_go_up(FileListView *view);
+
+// 设置视图模式
+void file_list_view_set_mode(FileListView *view, ViewMode mode);
+
+// 刷新文件列表
+void file_list_view_refresh(FileListView *view);
+
 // 创建文件列表视图
 FileListView* file_list_view_new(struct Window *window) {
     if (!window) {
@@ -63,6 +107,11 @@ FileListView* file_list_view_new(struct Window *window) {
     view->item_height = DEFAULT_ITEM_HEIGHT;
     view->selected_index = -1;
     
+    view->current_path = NULL;
+    
+    view->on_right_click = NULL;
+    view->on_directory_changed = NULL;
+    
     // 设置视口区域（默认为整个窗口）
     view->viewport.x = 0;
     view->viewport.y = 0;
@@ -88,6 +137,11 @@ void file_list_view_free(FileListView *view) {
         file_list_free(view->files);
     }
 
+    // 释放当前路径
+    if (view->current_path) {
+        free(view->current_path);
+    }
+
     // 释放图标纹理
     if (view->folder_icon) {
         SDL_DestroyTexture(view->folder_icon);
@@ -110,7 +164,23 @@ bool file_list_view_load_directory(FileListView *view, const char *path) {
     view->selected_index = -1;
 
     // 加载目录内容
-    return file_list_load_directory(view->files, path);
+    bool result = file_list_load_directory(view->files, path);
+    
+    // 如果成功加载，保存当前路径并通知目录变更
+    if (result) {
+        // 更新当前路径
+        if (view->current_path) {
+            free(view->current_path);
+        }
+        view->current_path = strdup(path);
+        
+        // 调用目录变更回调
+        if (view->on_directory_changed) {
+            view->on_directory_changed(view, path);
+        }
+    }
+    
+    return result;
 }
 
 // 加载图标
@@ -218,38 +288,56 @@ void file_list_view_draw(FileListView *view) {
     if (!view || !view->window || !view->window->renderer || !view->files) {
         return;
     }
-
+    
+    // 获取渲染器和字体
     SDL_Renderer *renderer = view->window->renderer;
     TTF_Font *font = view->window->font;
     
-    if (!font) {
-        return;
-    }
+    // 文本颜色
+    SDL_Color text_color = {0, 0, 0, 255};
+    SDL_Color selected_text_color = {255, 255, 255, 255};
+    SDL_Color selected_bg_color = {0, 120, 215, 255};
     
-    // 设置裁剪区域（视口）
-    SDL_SetRenderClipRect(renderer, &view->viewport);
-
+    // 设置裁剪区域，只在视口内绘制
+    SDL_Rect viewportRect = {
+        view->viewport.x,
+        view->viewport.y,
+        view->viewport.w,
+        view->viewport.h
+    };
+    SDL_SetRenderClipRect(renderer, &viewportRect);
+    
     // 绘制背景
-    SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
-    SDL_FRect bg_rect = {view->viewport.x, view->viewport.y, view->viewport.w, view->viewport.h};
+    SDL_FRect bg_rect = {
+        (float)view->viewport.x, 
+        (float)view->viewport.y, 
+        (float)view->viewport.w, 
+        (float)view->viewport.h
+    };
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderFillRect(renderer, &bg_rect);
-
-    // 如果列表为空
+    
+    // 如果没有文件，显示空目录提示
     if (!view->files->head) {
-        // 绘制空列表提示
-        SDL_Color text_color = {100, 100, 100, 255};
-        SDL_Surface *text_surface = TTF_RenderText_Blended(font, "空文件夹", 0,text_color);
+        // 设置文本颜色
+        SDL_Color empty_color = {128, 128, 128, 255};
+        const char* empty_text = "Empty folder";
+        size_t text_len = strlen(empty_text);
+        
+        // 渲染"空目录"文本
+        SDL_Surface *text_surface = TTF_RenderText_Blended(font, empty_text, text_len, empty_color);
         if (text_surface) {
             SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
             if (text_texture) {
-                SDL_Rect text_rect;
-                text_rect.w = text_surface->w;
-                text_rect.h = text_surface->h;
-                text_rect.x = view->viewport.x + (view->viewport.w - text_rect.w) / 2;
-                text_rect.y = view->viewport.y + (view->viewport.h - text_rect.h) / 2;
+                SDL_FRect text_rect = {
+                    0, 0, 
+                    (float)text_surface->w, 
+                    (float)text_surface->h
+                };
+                text_rect.x = (float)view->viewport.x + ((float)view->viewport.w - text_rect.w) / 2;
+                text_rect.y = (float)view->viewport.y + ((float)view->viewport.h - text_rect.h) / 2;
                 
-                SDL_FRect text_frect = {text_rect.x, text_rect.y, text_rect.w, text_rect.h};
-                SDL_RenderTexture(renderer, text_texture, NULL, &text_frect);
+                SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
                 SDL_DestroyTexture(text_texture);
             }
             SDL_DestroySurface(text_surface);
@@ -259,59 +347,70 @@ void file_list_view_draw(FileListView *view) {
         SDL_SetRenderClipRect(renderer, NULL);
         return;
     }
+
     // 根据视图模式绘制文件列表
     if (view->view_mode == VIEW_MODE_ICONS) {
         // 图标视图
-        int x = view->viewport.x + 10;
-        int y = view->viewport.y + 10 - view->scroll_offset_y;
-        int max_x = view->viewport.x + view->viewport.w - view->item_width - 10;
-        int index = 0;
+        int x = (int)view->viewport.x + 10;
+        int y = (int)view->viewport.y + 10 - view->scroll_offset_y;
+        int max_x = (int)view->viewport.x + (int)view->viewport.w - view->item_width - 10;
         
+        // 遍历所有文件项
+        int index = 0;
         FileItem *item = view->files->head;
         while (item) {
-            // 跳过隐藏文件（如果需要）
+            // 跳过隐藏文件
             if (item->is_hidden && !view->show_hidden) {
                 item = item->next;
                 continue;
             }
             
-            // 计算项目位置
+            // 换行处理
             if (x > max_x) {
-                x = view->viewport.x + 10;
+                x = (int)view->viewport.x + 10;
                 y += view->item_height + 10;
             }
             
-            // 如果项目在可视区域内
-            if (y + view->item_height >= view->viewport.y && y <= view->viewport.y + view->viewport.h) {
-                // 绘制项目背景（如果被选中）
+            // 只绘制可见区域内的项目
+            if (y + view->item_height >= (int)view->viewport.y && y <= (int)view->viewport.y + (int)view->viewport.h) {
+                // 绘制选中背景
                 if (index == view->selected_index) {
-                    SDL_SetRenderDrawColor(renderer, 200, 220, 255, 255);
-                    SDL_FRect select_rect = {x - 5, y - 5, view->item_width + 10, view->item_height + 10};
+                    SDL_SetRenderDrawColor(renderer, selected_bg_color.r, selected_bg_color.g, selected_bg_color.b, selected_bg_color.a);
+                    SDL_FRect select_rect = {
+                        (float)(x - 5), 
+                        (float)(y - 5), 
+                        (float)(view->item_width + 10), 
+                        (float)(view->item_height + 10)
+                    };
                     SDL_RenderFillRect(renderer, &select_rect);
                 }
                 
                 // 绘制图标
                 SDL_Texture *icon = (item->type == FILE_TYPE_DIRECTORY) ? view->folder_icon : view->file_icon;
                 if (icon) {
-                    SDL_Rect icon_rect = {x + (view->item_width - 32) / 2, y, 32, 32};
-                    SDL_FRect icon_frect = {icon_rect.x, icon_rect.y, icon_rect.w, icon_rect.h};
-                    SDL_RenderTexture(renderer, icon, NULL, &icon_frect);
+                    SDL_FRect icon_rect = {
+                        (float)(x + (view->item_width - 32) / 2), 
+                        (float)y, 
+                        32.0f, 
+                        32.0f
+                    };
+                    SDL_RenderTexture(renderer, icon, NULL, &icon_rect);
                 }
                 
                 // 绘制文件名
-                SDL_Color text_color = {0, 0, 0, 255};
-                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->display_name, 0,text_color);
+                SDL_Color current_text_color = (index == view->selected_index) ? selected_text_color : text_color;
+                size_t name_len = strlen(item->name);
+                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
                 if (text_surface) {
                     SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
                     if (text_texture) {
-                        SDL_Rect text_rect;
-                        text_rect.w = (text_surface->w > view->item_width) ? view->item_width : text_surface->w;
-                        text_rect.h = text_surface->h;
-                        text_rect.x = x + (view->item_width - text_rect.w) / 2;
-                        text_rect.y = y + 40;
+                        SDL_FRect text_rect = {0, 0, 0, 0};
+                        text_rect.w = (text_surface->w > view->item_width) ? (float)view->item_width : (float)text_surface->w;
+                        text_rect.h = (float)text_surface->h;
+                        text_rect.x = (float)x + ((float)view->item_width - text_rect.w) / 2;
+                        text_rect.y = (float)(y + 40);
                         
-                        SDL_FRect text_frect = {text_rect.x, text_rect.y, text_rect.w, text_rect.h};
-                        SDL_RenderTexture(renderer, text_texture, NULL, &text_frect);
+                        SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
                         SDL_DestroyTexture(text_texture);
                     }
                     SDL_DestroySurface(text_surface);
@@ -320,98 +419,112 @@ void file_list_view_draw(FileListView *view) {
             
             // 移动到下一个位置
             x += view->item_width + 10;
-            item = item->next;
             index++;
+            item = item->next;
         }
     } else {
-        // 列表视图或详细信息视图
-        int y = view->viewport.y + 5 - view->scroll_offset_y;
-        int index = 0;
+        // 列表视图
+        int y = (int)view->viewport.y + 5 - view->scroll_offset_y;
         
+        // 遍历所有文件项
+        int index = 0;
         FileItem *item = view->files->head;
         while (item) {
-            // 跳过隐藏文件（如果需要）
+            // 跳过隐藏文件
             if (item->is_hidden && !view->show_hidden) {
                 item = item->next;
                 continue;
             }
             
-            // 如果项目在可视区域内
-            if (y + view->item_height >= view->viewport.y && y <= view->viewport.y + view->viewport.h) {
-                // 绘制项目背景（如果被选中）
+            // 只绘制可见区域内的项目
+            if (y + view->item_height >= (int)view->viewport.y && y <= (int)view->viewport.y + (int)view->viewport.h) {
+                // 绘制选中背景
                 if (index == view->selected_index) {
-                    SDL_SetRenderDrawColor(renderer, 200, 220, 255, 255);
-                    SDL_FRect select_rect = {view->viewport.x + 5, y, view->viewport.w - 10, view->item_height};
+                    SDL_SetRenderDrawColor(renderer, selected_bg_color.r, selected_bg_color.g, selected_bg_color.b, selected_bg_color.a);
+                    SDL_FRect select_rect = {
+                        (float)view->viewport.x + 5, 
+                        (float)y, 
+                        (float)view->viewport.w - 10, 
+                        (float)view->item_height
+                    };
                     SDL_RenderFillRect(renderer, &select_rect);
                 }
                 
                 // 绘制图标
                 SDL_Texture *icon = (item->type == FILE_TYPE_DIRECTORY) ? view->folder_icon : view->file_icon;
                 if (icon) {
-                    SDL_Rect icon_rect = {view->viewport.x + 10, y + (view->item_height - 16) / 2, 16, 16};
-                    SDL_FRect icon_frect = {icon_rect.x, icon_rect.y, icon_rect.w, icon_rect.h};
-                    SDL_RenderTexture(renderer, icon, NULL, &icon_frect);
+                    SDL_FRect icon_rect = {
+                        (float)view->viewport.x + 10, 
+                        (float)y + (float)(view->item_height - 16) / 2, 
+                        16.0f, 
+                        16.0f
+                    };
+                    SDL_RenderTexture(renderer, icon, NULL, &icon_rect);
                 }
                 
                 // 绘制文件名
-                SDL_Color text_color = {0, 0, 0, 255};
-                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->display_name,0, text_color);
+                SDL_Color current_text_color = (index == view->selected_index) ? selected_text_color : text_color;
+                size_t name_len = strlen(item->name);
+                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
                 if (text_surface) {
                     SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
                     if (text_texture) {
-                        SDL_Rect text_rect;
-                        text_rect.w = text_surface->w;
-                        text_rect.h = text_surface->h;
-                        text_rect.x = view->viewport.x + 35;
-                        text_rect.y = y + (view->item_height - text_rect.h) / 2;
+                        SDL_FRect text_rect = {0, 0, 0, 0};
+                        text_rect.w = (float)text_surface->w;
+                        text_rect.h = (float)text_surface->h;
+                        text_rect.x = (float)view->viewport.x + 35;
+                        text_rect.y = (float)y + ((float)view->item_height - text_rect.h) / 2;
                         
-                        SDL_FRect text_frect = {text_rect.x, text_rect.y, text_rect.w, text_rect.h};
-                        SDL_RenderTexture(renderer, text_texture, NULL, &text_frect);
+                        SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
                         SDL_DestroyTexture(text_texture);
                     }
                     SDL_DestroySurface(text_surface);
                 }
                 
-                // 如果是详细信息视图，绘制额外信息
+                // 详细视图模式下显示文件大小和修改时间
                 if (view->view_mode == VIEW_MODE_DETAILS) {
-                    // 绘制文件大小
-                    char size_buffer[32];
-                    const char *size_str = (item->type == FILE_TYPE_DIRECTORY) ? "<目录>" : 
-                                          get_size_string(item->size, size_buffer, sizeof(size_buffer));
+                    // 显示文件大小
+                    char size_str[64] = {0};
+                    if (item->type == FILE_TYPE_DIRECTORY) {
+                        strcpy(size_str, "<DIR>");
+                    } else {
+                        // 格式化文件大小
+                        format_file_size(item->size, size_str, sizeof(size_str));
+                    }
                     
-                    SDL_Surface *size_surface = TTF_RenderText_Blended(font, size_str, 0,text_color);
+                    size_t size_len = strlen(size_str);
+                    SDL_Surface *size_surface = TTF_RenderText_Blended(font, size_str, size_len, current_text_color);
                     if (size_surface) {
                         SDL_Texture *size_texture = SDL_CreateTextureFromSurface(renderer, size_surface);
                         if (size_texture) {
-                            SDL_Rect size_rect;
-                            size_rect.w = size_surface->w;
-                            size_rect.h = size_surface->h;
-                            size_rect.x = view->viewport.x + 300;
-                            size_rect.y = y + (view->item_height - size_rect.h) / 2;
+                            SDL_FRect size_rect = {0, 0, 0, 0};
+                            size_rect.w = (float)size_surface->w;
+                            size_rect.h = (float)size_surface->h;
+                            size_rect.x = (float)view->viewport.x + 300;
+                            size_rect.y = (float)y + ((float)view->item_height - size_rect.h) / 2;
                             
-                            SDL_FRect size_frect = {size_rect.x, size_rect.y, size_rect.w, size_rect.h};
-                            SDL_RenderTexture(renderer, size_texture, NULL, &size_frect);
+                            SDL_RenderTexture(renderer, size_texture, NULL, &size_rect);
                             SDL_DestroyTexture(size_texture);
                         }
                         SDL_DestroySurface(size_surface);
                     }
                     
-                    // 绘制修改日期
-                    char time_buffer[64];
-                    const char *time_str = get_time_string(item->modified_time, time_buffer, sizeof(time_buffer));
+                    // 显示修改时间
+                    char time_str[64] = {0};
+                    format_time(item->modified_time, time_str, sizeof(time_str));
                     
-                    SDL_Surface *time_surface = TTF_RenderText_Blended(font, time_str,0, text_color);
+                    size_t time_len = strlen(time_str);
+                    SDL_Surface *time_surface = TTF_RenderText_Blended(font, time_str, time_len, current_text_color);
                     if (time_surface) {
                         SDL_Texture *time_texture = SDL_CreateTextureFromSurface(renderer, time_surface);
                         if (time_texture) {
-                            SDL_Rect time_rect;
-                            time_rect.w = time_surface->w;
-                            time_rect.h = time_surface->h;
-                            time_rect.x = view->viewport.x + 450;
-                            time_rect.y = y + (view->item_height - time_rect.h) / 2;
+                            SDL_FRect time_rect = {0, 0, 0, 0};
+                            time_rect.w = (float)time_surface->w;
+                            time_rect.h = (float)time_surface->h;
+                            time_rect.x = (float)view->viewport.x + 450;
+                            time_rect.y = (float)y + ((float)view->item_height - time_rect.h) / 2;
                             
-                            SDL_FRect time_frect = {time_rect.x, time_rect.y, time_rect.w, time_rect.h};
-                            SDL_RenderTexture(renderer, time_texture, NULL, &time_frect);
+                            SDL_RenderTexture(renderer, time_texture, NULL, &time_rect);
                             SDL_DestroyTexture(time_texture);
                         }
                         SDL_DestroySurface(time_surface);
@@ -419,10 +532,10 @@ void file_list_view_draw(FileListView *view) {
                 }
             }
             
-            // 移动到下一个位置
+            // 移动到下一行
             y += view->item_height + 2;
-            item = item->next;
             index++;
+            item = item->next;
         }
     }
     
@@ -540,13 +653,13 @@ void file_list_view_open_selected(FileListView *view) {
 
 // 返回上级目录
 void file_list_view_go_up(FileListView *view) {
-    if (!view || !view->files || !view->files->current_dir) {
+    if (!view || !view->current_path) {
         return;
     }
     
     // 获取上级目录路径
     char parent_dir[PATH_MAX];
-    strcpy(parent_dir, view->files->current_dir);
+    strcpy(parent_dir, view->current_path);
     
     // 检查是否已经在驱动器根目录（如 "E:\\"）
     size_t len = strlen(parent_dir);
