@@ -141,27 +141,30 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
             break;
             
         case BUTTON_REFRESH:
-            // 绘制刷新图标 (简化的循环箭头)
+            // 绘制刷新图标 (圆形)
             {
                 int cx = icon_x + icon_size / 2;
                 int cy = icon_y + icon_size / 2;
-                int r = icon_size / 2;
+                int r = icon_size / 2 - 2;  // 稍微缩小半径以确保在按钮内
                 
-                // 绘制圆弧 (简化为几条线段)
-                SDL_FPoint arc[5] = {
-                    {(float)(cx - r), (float)cy},
-                    {(float)(cx - r/2), (float)(cy - r/2)},
-                    {(float)cx, (float)(cy - r)},
-                    {(float)(cx + r/2), (float)(cy - r/2)},
-                    {(float)(cx + r), (float)cy}
-                };
-                SDL_RenderLines(renderer, arc, 5);
+                // 绘制完整圆形
+                for (int i = 0; i < 16; i++) {
+                    double angle1 = i * M_PI / 8;
+                    double angle2 = (i + 1) * M_PI / 8;
+                    
+                    float x1 = cx + r * cos(angle1);
+                    float y1 = cy + r * sin(angle1);
+                    float x2 = cx + r * cos(angle2);
+                    float y2 = cy + r * sin(angle2);
+                    
+                    SDL_RenderLine(renderer, x1, y1, x2, y2);
+                }
                 
                 // 绘制箭头
                 SDL_FPoint arrow[3] = {
-                    {(float)(cx + r), (float)cy},
-                    {(float)(cx + r - r/3), (float)(cy - r/3)},
-                    {(float)(cx + r - r/3), (float)(cy + r/3)}
+                    {(float)(cx + r * 0.7), (float)(cy - r * 0.7)},
+                    {(float)(cx + r), (float)(cy - r * 0.7)},
+                    {(float)(cx + r), (float)(cy - r * 0.4)}
                 };
                 SDL_RenderLines(renderer, arrow, 3);
             }
