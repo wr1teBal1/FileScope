@@ -371,6 +371,12 @@ void file_list_view_draw(FileListView *view) {
         return;
     }
 
+    // 计算表头高度
+    int header_height = 0;
+    if (view->view_mode == VIEW_MODE_DETAILS) {
+        header_height = 30;
+    }
+    
     // 根据视图模式绘制文件列表
     if (view->view_mode == VIEW_MODE_ICONS) {
         // 图标视图
@@ -394,8 +400,9 @@ void file_list_view_draw(FileListView *view) {
                 y += view->item_height + 10;
             }
             
-            // 只绘制可见区域内的项目
-            if (y + view->item_height >= (int)view->viewport.y && y <= (int)view->viewport.y + (int)view->viewport.h) {
+            // 只绘制可见区域内的项目，考虑表头高度
+            int content_start_y = (int)view->viewport.y + header_height;
+            if (y + view->item_height >= content_start_y && y <= (int)view->viewport.y + (int)view->viewport.h) {
                 // 绘制选中背景
                 if (index == view->selected_index) {
                     SDL_SetRenderDrawColor(renderer, selected_bg_color.r, selected_bg_color.g, selected_bg_color.b, selected_bg_color.a);
@@ -446,8 +453,112 @@ void file_list_view_draw(FileListView *view) {
             item = item->next;
         }
     } else {
-        // 列表视图
-        int y = (int)view->viewport.y + 5 - view->scroll_offset_y;
+        // 列表视图和详细信息视图
+        int header_y = (int)view->viewport.y + 5;
+        
+        // 在详细信息视图中绘制表头
+        if (view->view_mode == VIEW_MODE_DETAILS) {
+            
+            // 绘制表头背景
+            SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
+            SDL_FRect header_bg = {
+                (float)view->viewport.x,
+                (float)header_y,
+                (float)view->viewport.w,
+                (float)header_height
+            };
+            SDL_RenderFillRect(renderer, &header_bg);
+            
+            // 绘制表头分隔线
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            SDL_RenderLine(renderer, 
+                (float)view->viewport.x, 
+                (float)(header_y + header_height), 
+                (float)(view->viewport.x + view->viewport.w), 
+                (float)(header_y + header_height));
+            
+            // 绘制列标题
+            SDL_Color header_text_color = {64, 64, 64, 255};
+            
+            // "名称" 列标题
+            const char* name_header = "名称";
+            size_t name_header_len = strlen(name_header);
+            SDL_Surface *name_surface = TTF_RenderText_Blended(font, name_header, name_header_len, header_text_color);
+            if (name_surface) {
+                SDL_Texture *name_texture = SDL_CreateTextureFromSurface(renderer, name_surface);
+                if (name_texture) {
+                    SDL_FRect name_rect = {
+                        (float)view->viewport.x + 40,
+                        (float)header_y + ((float)header_height - (float)name_surface->h) / 2,
+                        (float)name_surface->w,
+                        (float)name_surface->h
+                    };
+                    SDL_RenderTexture(renderer, name_texture, NULL, &name_rect);
+                    SDL_DestroyTexture(name_texture);
+                }
+                SDL_DestroySurface(name_surface);
+            }
+            
+            // "大小" 列标题
+            const char* size_header = "大小";
+            size_t size_header_len = strlen(size_header);
+            SDL_Surface *size_surface = TTF_RenderText_Blended(font, size_header, size_header_len, header_text_color);
+            if (size_surface) {
+                SDL_Texture *size_texture = SDL_CreateTextureFromSurface(renderer, size_surface);
+                if (size_texture) {
+                    SDL_FRect size_rect = {
+                        (float)view->viewport.x + 300,
+                        (float)header_y + ((float)header_height - (float)size_surface->h) / 2,
+                        (float)size_surface->w,
+                        (float)size_surface->h
+                    };
+                    SDL_RenderTexture(renderer, size_texture, NULL, &size_rect);
+                    SDL_DestroyTexture(size_texture);
+                }
+                SDL_DestroySurface(size_surface);
+            }
+            
+            // "修改日期" 列标题
+            const char* date_header = "修改日期";
+            size_t date_header_len = strlen(date_header);
+            SDL_Surface *date_surface = TTF_RenderText_Blended(font, date_header, date_header_len, header_text_color);
+            if (date_surface) {
+                SDL_Texture *date_texture = SDL_CreateTextureFromSurface(renderer, date_surface);
+                if (date_texture) {
+                    SDL_FRect date_rect = {
+                        (float)view->viewport.x + 450,
+                        (float)header_y + ((float)header_height - (float)date_surface->h) / 2,
+                        (float)date_surface->w,
+                        (float)date_surface->h
+                    };
+                    SDL_RenderTexture(renderer, date_texture, NULL, &date_rect);
+                    SDL_DestroyTexture(date_texture);
+                }
+                SDL_DestroySurface(date_surface);
+            }
+            
+            // 绘制列分隔线
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            SDL_RenderLine(renderer, 
+                (float)view->viewport.x + 290, 
+                (float)header_y, 
+                (float)view->viewport.x + 290, 
+                (float)(header_y + header_height));
+            SDL_RenderLine(renderer, 
+                (float)view->viewport.x + 440, 
+                (float)header_y, 
+                (float)view->viewport.x + 440, 
+                (float)(header_y + header_height));
+        }
+        
+        // 为文件内容设置裁剪区域，避免覆盖表头
+        SDL_Rect contentRect = {
+            view->viewport.x,
+            header_y + header_height,
+            view->viewport.w,
+            view->viewport.h - header_height
+        };
+        SDL_SetRenderClipRect(renderer, &contentRect);
         
         // 遍历所有文件项
         int index = 0;
@@ -459,8 +570,12 @@ void file_list_view_draw(FileListView *view) {
                 continue;
             }
             
-            // 只绘制可见区域内的项目
-            if (y + view->item_height >= (int)view->viewport.y && y <= (int)view->viewport.y + (int)view->viewport.h) {
+            // 计算当前项的y坐标
+            int y = (int)view->viewport.y + header_height + 5 + (index * view->item_height) - view->scroll_offset_y;
+            
+            // 只绘制可见区域内的项目，考虑表头高度
+            int content_start_y = (int)view->viewport.y + header_height;
+            if (y + view->item_height >= content_start_y && y <= (int)view->viewport.y + (int)view->viewport.h) {
                 // 绘制选中背景
                 if (index == view->selected_index) {
                     SDL_SetRenderDrawColor(renderer, selected_bg_color.r, selected_bg_color.g, selected_bg_color.b, selected_bg_color.a);
@@ -555,8 +670,7 @@ void file_list_view_draw(FileListView *view) {
                 }
             }
             
-            // 移动到下一行
-            y += view->item_height + 2;
+            // 移动到下一项
             index++;
             item = item->next;
         }
@@ -898,7 +1012,11 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                     }
                 } else {
                     // 列表视图或详细信息视图
-                    clicked_index = (y - view->viewport.y + view->scroll_offset_y - 5) / (view->item_height + 2);
+                    int content_start_offset = 5;
+                    if (view->view_mode == VIEW_MODE_DETAILS) {
+                        content_start_offset += 30; // 表头高度
+                    }
+                    clicked_index = (y - view->viewport.y + view->scroll_offset_y - content_start_offset) / (view->item_height + 2);
                 }
                 
                 // 验证点击的索引是否有效

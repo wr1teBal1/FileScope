@@ -84,11 +84,10 @@ MainWindow* main_window_new(Window *a) {
     // window->sidebar = sidebar_new(app);
 
     // 设置文件列表视图的视口区域
-    int toolbar_height = 40; // 工具栏高度
     window->file_list_view->viewport.x = 0;
-    window->file_list_view->viewport.y = toolbar_height;
+    window->file_list_view->viewport.y = TOOLBAR_HEIGHT;
     window->file_list_view->viewport.w = SDL_WINDOW_WIDTH; // TODO: 考虑侧边栏宽度
-    window->file_list_view->viewport.h = SDL_WINDOW_HEIGHT - toolbar_height;
+    window->file_list_view->viewport.h = SDL_WINDOW_HEIGHT - TOOLBAR_HEIGHT;
 
     // 设置用户数据，用于回调函数中获取主窗口实例
     a->user_data = window;
