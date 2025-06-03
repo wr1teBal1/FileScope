@@ -17,6 +17,12 @@
         "main_window.h": "c",
         "sdl_platform_defines.h": "c",
         "math.h": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "window.h": "c",
+        "bit": "c",
+        "compare": "c",
+        "limits": "c",
+        "renderer.h": "c",
+        "sdl_blendmode.h": "c"
     }
 }

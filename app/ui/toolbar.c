@@ -62,7 +62,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
         (float)button->rect.w,
         (float)button->rect.h
     };
-    SDL_RenderFillRect(renderer, &frect);
+    SDL_RenderFillRect(renderer, &frect);// 绘制矩形
     
     // 绘制按钮边框
     SDL_SetRenderDrawColor(renderer, BUTTON_BORDER_COLOR.r, BUTTON_BORDER_COLOR.g, BUTTON_BORDER_COLOR.b, BUTTON_BORDER_COLOR.a);
@@ -118,7 +118,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
                 };
                 SDL_RenderFillRect(renderer, &line);
             }
-            break;
+            break;//有问题
             
         case BUTTON_HOME:
             // 绘制主目录图标 (简化的房子)
@@ -138,7 +138,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
                 };
                 SDL_RenderRect(renderer, &house);
             }
-            break;
+            break;//有问题
             
         case BUTTON_REFRESH:
             // 绘制刷新图标 (圆形)
@@ -158,7 +158,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
                     float y2 = cy + r * sin(angle2);
                     
                     SDL_RenderLine(renderer, x1, y1, x2, y2);
-                }
+                }//有问题
                 
                 // 绘制箭头
                 SDL_FPoint arrow[3] = {
@@ -707,26 +707,3 @@ void toolbar_draw(Toolbar *toolbar) {
     }
 }
 
-// 工具栏基本函数声明
-Toolbar* toolbar_new(struct Window *app);  // 创建新的工具栏
-void toolbar_free(Toolbar *toolbar);       // 释放工具栏资源
-bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event);  // 处理用户事件
-void toolbar_draw(Toolbar *toolbar);       // 绘制工具栏
-
-// 通知工具栏目录已更改
-void toolbar_notify_directory_changed(Toolbar *toolbar, const char *path);  // 当目录改变时更新历史
-
-// 历史导航函数
-bool toolbar_go_back(Toolbar *toolbar);     // 后退到上一个访问的目录
-bool toolbar_go_forward(Toolbar *toolbar);  // 前进到下一个访问的目录
-bool toolbar_go_up(Toolbar *toolbar);       // 上升到父目录
-bool toolbar_go_home(Toolbar *toolbar);     // 返回到主目录
-
-// 按钮操作函数
-bool toolbar_refresh(Toolbar *toolbar);     // 刷新当前目录
-bool toolbar_toggle_view(Toolbar *toolbar); // 切换文件视图模式
-bool toolbar_search(Toolbar *toolbar, const char *search_term);  // 搜索文件
-
-// 设置按钮状态
-void toolbar_set_button_enabled(Toolbar *toolbar, ToolbarButtonType button_type, bool enabled);  // 启用/禁用特定按钮
-void toolbar_update_button_states(Toolbar *toolbar);  // 更新所有按钮状态
