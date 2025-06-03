@@ -228,6 +228,29 @@ void file_list_view_set_mode(FileListView *view, ViewMode mode) {
     }
 }
 
+// 切换到下一个视图模式
+void file_list_view_toggle_mode(FileListView *view) {
+    if (!view) {
+        return;
+    }
+    
+    // 循环切换视图模式：图标 -> 列表 -> 详细信息 -> 图标
+    switch (view->view_mode) {
+        case VIEW_MODE_ICONS:
+            file_list_view_set_mode(view, VIEW_MODE_LIST);
+            break;
+        case VIEW_MODE_LIST:
+            file_list_view_set_mode(view, VIEW_MODE_DETAILS);
+            break;
+        case VIEW_MODE_DETAILS:
+            file_list_view_set_mode(view, VIEW_MODE_ICONS);
+            break;
+        default:
+            file_list_view_set_mode(view, VIEW_MODE_ICONS);
+            break;
+    }
+}
+
 // 设置排序方式
 void file_list_view_set_sort(FileListView *view, SortMode sort) {
     if (!view) {

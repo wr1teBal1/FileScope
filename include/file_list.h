@@ -68,6 +68,9 @@ void file_list_view_refresh(FileListView *view);
 // 设置视图模式
 void file_list_view_set_mode(FileListView *view, ViewMode mode);
 
+// 切换到下一个视图模式
+void file_list_view_toggle_mode(FileListView *view);
+
 // 设置排序方式
 void file_list_view_set_sort(FileListView *view, SortMode sort);
 

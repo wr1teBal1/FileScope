@@ -451,7 +451,13 @@ static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
             break;
             
         case BUTTON_VIEW:
-            // TODO: 实现视图切换功能
+            // 实现视图切换功能
+            {
+                MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
+                if (main_window && main_window->file_list_view) {
+                    file_list_view_toggle_mode(main_window->file_list_view);
+                }
+            }
             break;
             
         default:
