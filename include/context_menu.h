@@ -35,6 +35,9 @@ typedef struct MenuItem {
     struct MenuItem *next;  // 下一个菜单项
 } MenuItem;
 
+// 前向声明
+struct FileListView;
+
 // 右键菜单结构
 typedef struct {
     struct Window *window;  // 窗口引用
@@ -43,6 +46,8 @@ typedef struct {
     int width, height;     // 菜单尺寸
     bool visible;          // 是否可见
     FileItem *target_item; // 目标文件项（如果有）
+    char *current_dir;     // 当前目录路径
+    struct FileListView *file_list_view; // 文件列表视图引用
 } ContextMenu;
 
 // 创建右键菜单
@@ -68,5 +73,11 @@ void context_menu_draw(ContextMenu *menu);
 
 // 执行菜单动作
 void context_menu_execute_action(ContextMenu *menu, MenuAction action);
+
+// 设置当前目录
+void context_menu_set_current_dir(ContextMenu *menu, const char *dir);
+
+// 设置文件列表视图引用
+void context_menu_set_file_list_view(ContextMenu *menu, struct FileListView *view);
 
 #endif // CONTEXT_MENU_H

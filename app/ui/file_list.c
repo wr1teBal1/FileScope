@@ -11,6 +11,7 @@
 #include "file_list.h"
 #include "file_item.h"
 #include "renderer.h"
+#include "file_ops.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,6 +113,20 @@ FileListView* file_list_view_new(struct Window *window) {
     view->on_right_click = NULL;
     view->on_directory_changed = NULL;
     
+    // 初始化内联编辑相关字段
+    view->is_editing = false;
+    view->editing_index = -1;
+    view->edit_buffer = NULL;
+    view->edit_buffer_size = 0;
+    view->edit_cursor_pos = 0;
+    
+    // 停止文本输入
+    if (view->window && view->window->window) {
+        SDL_StopTextInput(view->window->window);
+    }
+    view->last_blink_time = 0;
+    view->cursor_visible = true;
+    
     // 设置视口区域（默认为整个窗口）
     view->viewport.x = 0;
     view->viewport.y = 0;
@@ -141,15 +156,20 @@ void file_list_view_free(FileListView *view) {
     if (view->current_path) {
         free(view->current_path);
     }
-
-    // 释放图标纹理
+    
     if (view->folder_icon) {
         SDL_DestroyTexture(view->folder_icon);
     }
+    
     if (view->file_icon) {
         SDL_DestroyTexture(view->file_icon);
     }
-
+    
+    // 释放编辑缓冲区
+    if (view->edit_buffer) {
+        free(view->edit_buffer);
+    }
+    
     free(view);
 }
 
@@ -403,6 +423,9 @@ void file_list_view_draw(FileListView *view) {
             // 只绘制可见区域内的项目，考虑表头高度
             int content_start_y = (int)view->viewport.y + header_height;
             if (y + view->item_height >= content_start_y && y <= (int)view->viewport.y + (int)view->viewport.h) {
+                // 确定文本颜色
+                SDL_Color current_text_color = (index == view->selected_index) ? selected_text_color : text_color;
+                
                 // 绘制选中背景
                 if (index == view->selected_index) {
                     SDL_SetRenderDrawColor(renderer, selected_bg_color.r, selected_bg_color.g, selected_bg_color.b, selected_bg_color.a);
@@ -427,23 +450,93 @@ void file_list_view_draw(FileListView *view) {
                     SDL_RenderTexture(renderer, icon, NULL, &icon_rect);
                 }
                 
-                // 绘制文件名
-                SDL_Color current_text_color = (index == view->selected_index) ? selected_text_color : text_color;
-                size_t name_len = strlen(item->name);
-                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
-                if (text_surface) {
-                    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-                    if (text_texture) {
-                        SDL_FRect text_rect = {0, 0, 0, 0};
-                        text_rect.w = (text_surface->w > view->item_width) ? (float)view->item_width : (float)text_surface->w;
-                        text_rect.h = (float)text_surface->h;
-                        text_rect.x = (float)x + ((float)view->item_width - text_rect.w) / 2;
-                        text_rect.y = (float)(y + 40);
-                        
-                        SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
-                        SDL_DestroyTexture(text_texture);
+                // 绘制文件名或编辑框
+                if (view->is_editing && index == view->editing_index) {
+                    // 绘制编辑框
+                    SDL_FRect edit_rect = {
+                        (float)(x - 5),
+                        (float)(y + 35),
+                        (float)(view->item_width + 10),
+                        25.0f
+                    };
+                    
+                    // 绘制编辑框背景
+                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                    SDL_RenderFillRect(renderer, &edit_rect);
+                    
+                    // 绘制编辑框边框
+                    SDL_SetRenderDrawColor(renderer, 0, 120, 215, 255);
+                    SDL_RenderRect(renderer, &edit_rect);
+                    
+                    // 绘制编辑文本
+                    if (view->edit_buffer && strlen(view->edit_buffer) > 0) {
+                        SDL_Color edit_text_color = {0, 0, 0, 255};
+                        size_t edit_len = strlen(view->edit_buffer);
+                        SDL_Surface *edit_surface = TTF_RenderText_Blended(font, view->edit_buffer, edit_len, edit_text_color);
+                        if (edit_surface) {
+                            SDL_Texture *edit_texture = SDL_CreateTextureFromSurface(renderer, edit_surface);
+                            if (edit_texture) {
+                                SDL_FRect edit_text_rect = {
+                                    edit_rect.x + 3,
+                                    edit_rect.y + (edit_rect.h - edit_surface->h) / 2,
+                                    (float)edit_surface->w,
+                                    (float)edit_surface->h
+                                };
+                                
+                                // 限制文本宽度
+                                if (edit_text_rect.w > edit_rect.w - 6) {
+                                    edit_text_rect.w = edit_rect.w - 6;
+                                }
+                                
+                                SDL_RenderTexture(renderer, edit_texture, NULL, &edit_text_rect);
+                                SDL_DestroyTexture(edit_texture);
+                            }
+                            SDL_DestroySurface(edit_surface);
+                        }
                     }
-                    SDL_DestroySurface(text_surface);
+                    
+                    // 绘制光标
+                    Uint32 current_time = SDL_GetTicks();
+                    if (current_time - view->last_blink_time > 500) {
+                        view->cursor_visible = !view->cursor_visible;
+                        view->last_blink_time = current_time;
+                    }
+                    
+                    if (view->cursor_visible) {
+                        // 计算光标位置
+                        float cursor_x = edit_rect.x + 3;
+                        if (view->edit_buffer && view->edit_cursor_pos > 0) {
+                            char temp_char = view->edit_buffer[view->edit_cursor_pos];
+                            view->edit_buffer[view->edit_cursor_pos] = '\0';
+                            
+                            int text_w = 0;
+                            TTF_GetStringSize(font, view->edit_buffer, strlen(view->edit_buffer), &text_w, NULL);
+                            cursor_x += text_w;
+                            
+                            view->edit_buffer[view->edit_cursor_pos] = temp_char;
+                        }
+                        
+                        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                        SDL_RenderLine(renderer, cursor_x, edit_rect.y + 2, cursor_x, edit_rect.y + edit_rect.h - 2);
+                    }
+                } else {
+                    // 正常绘制文件名
+                    size_t name_len = strlen(item->name);
+                    SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
+                    if (text_surface) {
+                        SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+                        if (text_texture) {
+                            SDL_FRect text_rect = {0, 0, 0, 0};
+                            text_rect.w = (text_surface->w > view->item_width) ? (float)view->item_width : (float)text_surface->w;
+                            text_rect.h = (float)text_surface->h;
+                            text_rect.x = (float)x + ((float)view->item_width - text_rect.w) / 2;
+                            text_rect.y = (float)(y + 40);
+                            
+                            SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
+                            SDL_DestroyTexture(text_texture);
+                        }
+                        SDL_DestroySurface(text_surface);
+                    }
                 }
             }
             
@@ -576,6 +669,9 @@ void file_list_view_draw(FileListView *view) {
             // 只绘制可见区域内的项目，考虑表头高度
             int content_start_y = (int)view->viewport.y + header_height;
             if (y + view->item_height >= content_start_y && y <= (int)view->viewport.y + (int)view->viewport.h) {
+                // 确定文本颜色
+                SDL_Color current_text_color = (index == view->selected_index) ? selected_text_color : text_color;
+                
                 // 绘制选中背景
                 if (index == view->selected_index) {
                     SDL_SetRenderDrawColor(renderer, selected_bg_color.r, selected_bg_color.g, selected_bg_color.b, selected_bg_color.a);
@@ -600,23 +696,93 @@ void file_list_view_draw(FileListView *view) {
                     SDL_RenderTexture(renderer, icon, NULL, &icon_rect);
                 }
                 
-                // 绘制文件名
-                SDL_Color current_text_color = (index == view->selected_index) ? selected_text_color : text_color;
-                size_t name_len = strlen(item->name);
-                SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
-                if (text_surface) {
-                    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-                    if (text_texture) {
-                        SDL_FRect text_rect = {0, 0, 0, 0};
-                        text_rect.w = (float)text_surface->w;
-                        text_rect.h = (float)text_surface->h;
-                        text_rect.x = (float)view->viewport.x + 35;
-                        text_rect.y = (float)y + ((float)view->item_height - text_rect.h) / 2;
-                        
-                        SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
-                        SDL_DestroyTexture(text_texture);
+                // 绘制文件名或编辑框
+                if (view->is_editing && index == view->editing_index) {
+                    // 绘制编辑框
+                    SDL_FRect edit_rect = {
+                        (float)view->viewport.x + 30,
+                        (float)y + 2,
+                        250.0f,
+                        (float)(view->item_height - 4)
+                    };
+                    
+                    // 绘制编辑框背景
+                    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                    SDL_RenderFillRect(renderer, &edit_rect);
+                    
+                    // 绘制编辑框边框
+                    SDL_SetRenderDrawColor(renderer, 0, 120, 215, 255);
+                    SDL_RenderRect(renderer, &edit_rect);
+                    
+                    // 绘制编辑文本
+                    if (view->edit_buffer && strlen(view->edit_buffer) > 0) {
+                        SDL_Color edit_text_color = {0, 0, 0, 255};
+                        size_t edit_len = strlen(view->edit_buffer);
+                        SDL_Surface *edit_surface = TTF_RenderText_Blended(font, view->edit_buffer, edit_len, edit_text_color);
+                        if (edit_surface) {
+                            SDL_Texture *edit_texture = SDL_CreateTextureFromSurface(renderer, edit_surface);
+                            if (edit_texture) {
+                                SDL_FRect edit_text_rect = {
+                                    edit_rect.x + 3,
+                                    edit_rect.y + (edit_rect.h - edit_surface->h) / 2,
+                                    (float)edit_surface->w,
+                                    (float)edit_surface->h
+                                };
+                                
+                                // 限制文本宽度
+                                if (edit_text_rect.w > edit_rect.w - 6) {
+                                    edit_text_rect.w = edit_rect.w - 6;
+                                }
+                                
+                                SDL_RenderTexture(renderer, edit_texture, NULL, &edit_text_rect);
+                                SDL_DestroyTexture(edit_texture);
+                            }
+                            SDL_DestroySurface(edit_surface);
+                        }
                     }
-                    SDL_DestroySurface(text_surface);
+                    
+                    // 绘制光标
+                    Uint32 current_time = SDL_GetTicks();
+                    if (current_time - view->last_blink_time > 500) {
+                        view->cursor_visible = !view->cursor_visible;
+                        view->last_blink_time = current_time;
+                    }
+                    
+                    if (view->cursor_visible) {
+                        // 计算光标位置
+                        float cursor_x = edit_rect.x + 3;
+                        if (view->edit_buffer && view->edit_cursor_pos > 0) {
+                            char temp_char = view->edit_buffer[view->edit_cursor_pos];
+                            view->edit_buffer[view->edit_cursor_pos] = '\0';
+                            
+                            int text_w = 0;
+                            TTF_GetStringSize(font, view->edit_buffer, strlen(view->edit_buffer), &text_w, NULL);
+                            cursor_x += text_w;
+                            
+                            view->edit_buffer[view->edit_cursor_pos] = temp_char;
+                        }
+                        
+                        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                        SDL_RenderLine(renderer, cursor_x, edit_rect.y + 2, cursor_x, edit_rect.y + edit_rect.h - 2);
+                    }
+                } else {
+                    // 正常绘制文件名
+                    size_t name_len = strlen(item->name);
+                    SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
+                    if (text_surface) {
+                        SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+                        if (text_texture) {
+                            SDL_FRect text_rect = {0, 0, 0, 0};
+                            text_rect.w = (float)text_surface->w;
+                            text_rect.h = (float)text_surface->h;
+                            text_rect.x = (float)view->viewport.x + 35;
+                            text_rect.y = (float)y + ((float)view->item_height - text_rect.h) / 2;
+                            
+                            SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
+                            SDL_DestroyTexture(text_texture);
+                        }
+                        SDL_DestroySurface(text_surface);
+                    }
                 }
                 
                 // 详细视图模式下显示文件大小和修改时间
@@ -973,6 +1139,240 @@ void file_list_view_load_drives(FileListView *view) {
 #endif
 }
 
+// 设置右键点击回调
+void file_list_view_set_right_click_callback(FileListView *view, RightClickCallback callback) {
+    if (view) {
+        view->on_right_click = callback;
+    }
+}
+
+// 开始内联编辑
+void file_list_view_start_editing(FileListView *view, int index) {
+    if (!view || index < 0) {
+        return;
+    }
+    
+    // 获取要编辑的文件项
+    int visible_count = 0;
+    FileItem *item = view->files->head;
+    while (item) {
+        if (!item->is_hidden || view->show_hidden) {
+            if (visible_count == index) {
+                break;
+            }
+            visible_count++;
+        }
+        item = item->next;
+    }
+    
+    if (!item) {
+        return;
+    }
+    
+    // 停止之前的编辑
+    if (view->is_editing) {
+        file_list_view_stop_editing(view, false);
+    }
+    
+    // 设置编辑状态
+    view->is_editing = true;
+    view->editing_index = index;
+    
+    // 分配编辑缓冲区
+    const char *filename = item->display_name;
+    size_t name_len = strlen(filename);
+    view->edit_buffer_size = name_len + 256; // 额外空间用于输入
+    view->edit_buffer = (char*)malloc(view->edit_buffer_size);
+    
+    if (view->edit_buffer) {
+        strcpy(view->edit_buffer, filename);
+        view->edit_cursor_pos = name_len;
+    } else {
+        // 内存分配失败，取消编辑
+        view->is_editing = false;
+        view->editing_index = -1;
+        return;
+    }
+    
+    // 初始化光标闪烁
+    view->last_blink_time = SDL_GetTicks();
+    view->cursor_visible = true;
+    
+    // 启用文本输入
+    if (view->window && view->window->window) {
+        SDL_StartTextInput(view->window->window);
+    }
+    
+    printf("开始编辑文件: %s\n", filename);
+}
+
+// 停止内联编辑
+void file_list_view_stop_editing(FileListView *view, bool save_changes) {
+    if (!view || !view->is_editing) {
+        return;
+    }
+    
+    if (save_changes && view->edit_buffer) {
+        // 获取正在编辑的文件项
+        int visible_count = 0;
+        FileItem *item = view->files->head;
+        while (item) {
+            if (!item->is_hidden || view->show_hidden) {
+                if (visible_count == view->editing_index) {
+                    break;
+                }
+                visible_count++;
+            }
+            item = item->next;
+        }
+        
+        if (item && strlen(view->edit_buffer) > 0) {
+            // 构建完整路径
+            char *old_path = fs_combine_path(view->current_path, item->display_name);
+            if (old_path) {
+                // 执行重命名
+                if (file_ops_rename(old_path, view->edit_buffer)) {
+                    printf("文件重命名成功: %s -> %s\n", item->display_name, view->edit_buffer);
+                    // 刷新文件列表
+                    file_list_view_refresh(view);
+                } else {
+                    printf("文件重命名失败: %s -> %s\n", item->display_name, view->edit_buffer);
+                }
+                free(old_path);
+            }
+        }
+    }
+    
+    // 清理编辑状态
+    view->is_editing = false;
+    view->editing_index = -1;
+    
+    if (view->edit_buffer) {
+        free(view->edit_buffer);
+        view->edit_buffer = NULL;
+    }
+    
+    view->edit_buffer_size = 0;
+    view->edit_cursor_pos = 0;
+    
+    // 停止文本输入
+    if (view->window && view->window->window) {
+        SDL_StopTextInput(view->window->window);
+    }
+}
+
+// 检查是否正在编辑
+bool file_list_view_is_editing(FileListView *view) {
+    return view && view->is_editing;
+}
+
+// 处理文本输入
+void file_list_view_handle_text_input(FileListView *view, const char *text) {
+    if (!view || !view->is_editing || !view->edit_buffer || !text) {
+        return;
+    }
+    
+    size_t text_len = strlen(text);
+    size_t current_len = strlen(view->edit_buffer);
+    
+    // 检查是否有足够空间
+    if (current_len + text_len + 1 >= view->edit_buffer_size) {
+        return;
+    }
+    
+    // 在光标位置插入文本
+    if (view->edit_cursor_pos < current_len) {
+        // 移动光标后的文本
+        memmove(view->edit_buffer + view->edit_cursor_pos + text_len,
+                view->edit_buffer + view->edit_cursor_pos,
+                current_len - view->edit_cursor_pos + 1);
+    }
+    
+    // 插入新文本
+    memcpy(view->edit_buffer + view->edit_cursor_pos, text, text_len);
+    view->edit_cursor_pos += text_len;
+    
+    // 重置光标闪烁
+    view->last_blink_time = SDL_GetTicks();
+    view->cursor_visible = true;
+}
+
+// 处理键盘输入
+void file_list_view_handle_key_input(FileListView *view, SDL_Scancode scancode) {
+    if (!view || !view->is_editing || !view->edit_buffer) {
+        return;
+    }
+    
+    size_t current_len = strlen(view->edit_buffer);
+    
+    switch (scancode) {
+        case SDL_SCANCODE_RETURN:
+        case SDL_SCANCODE_KP_ENTER:
+            // 确认编辑
+            file_list_view_stop_editing(view, true);
+            break;
+            
+        case SDL_SCANCODE_ESCAPE:
+            // 取消编辑
+            file_list_view_stop_editing(view, false);
+            break;
+            
+        case SDL_SCANCODE_BACKSPACE:
+            // 删除光标前的字符
+            if (view->edit_cursor_pos > 0) {
+                if (view->edit_cursor_pos < current_len) {
+                    memmove(view->edit_buffer + view->edit_cursor_pos - 1,
+                            view->edit_buffer + view->edit_cursor_pos,
+                            current_len - view->edit_cursor_pos + 1);
+                } else {
+                    view->edit_buffer[view->edit_cursor_pos - 1] = '\0';
+                }
+                view->edit_cursor_pos--;
+            }
+            break;
+            
+        case SDL_SCANCODE_DELETE:
+            // 删除光标后的字符
+            if (view->edit_cursor_pos < current_len) {
+                memmove(view->edit_buffer + view->edit_cursor_pos,
+                        view->edit_buffer + view->edit_cursor_pos + 1,
+                        current_len - view->edit_cursor_pos);
+            }
+            break;
+            
+        case SDL_SCANCODE_LEFT:
+            // 光标左移
+            if (view->edit_cursor_pos > 0) {
+                view->edit_cursor_pos--;
+            }
+            break;
+            
+        case SDL_SCANCODE_RIGHT:
+            // 光标右移
+            if (view->edit_cursor_pos < current_len) {
+                view->edit_cursor_pos++;
+            }
+            break;
+            
+        case SDL_SCANCODE_HOME:
+            // 光标移到开头
+            view->edit_cursor_pos = 0;
+            break;
+            
+        case SDL_SCANCODE_END:
+            // 光标移到末尾
+            view->edit_cursor_pos = current_len;
+            break;
+            
+        default:
+            break;
+    }
+    
+    // 重置光标闪烁
+    view->last_blink_time = SDL_GetTicks();
+    view->cursor_visible = true;
+}
+
 // 处理事件
 bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
     if (!view || !event) {
@@ -980,6 +1380,14 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
     }
     
     switch (event->type) {
+        case SDL_EVENT_TEXT_INPUT: {
+            // 处理文本输入（用于内联编辑）
+            if (view->is_editing) {
+                file_list_view_handle_text_input(view, event->text.text);
+                return true;
+            }
+            break;
+        }
         case SDL_EVENT_MOUSE_WHEEL: {
             // 鼠标滚轮事件
             int delta = -event->wheel.y * 30; // 滚动速度因子
@@ -1000,15 +1408,38 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                 int clicked_index = -1;
                 
                 if (view->view_mode == VIEW_MODE_ICONS) {
-                    // 图标视图
-                    int items_per_row = (view->viewport.w - 20) / (view->item_width + 10);
-                    if (items_per_row < 1) items_per_row = 1;
+                    // 图标视图 - 使用与绘制逻辑完全一致的坐标计算
+                    int draw_x = (int)view->viewport.x + 10;
+                    int draw_y = (int)view->viewport.y + 10 - view->scroll_offset_y;
+                    int max_x = (int)view->viewport.x + (int)view->viewport.w - view->item_width - 10;
                     
-                    int row = (y - view->viewport.y + view->scroll_offset_y - 10) / (view->item_height + 10);
-                    int col = (x - view->viewport.x - 10) / (view->item_width + 10);
-                    
-                    if (col >= 0 && col < items_per_row) {
-                        clicked_index = row * items_per_row + col;
+                    // 遍历所有文件项，模拟绘制过程
+                    int index = 0;
+                    FileItem *item = view->files->head;
+                    while (item) {
+                        // 跳过隐藏文件
+                        if (item->is_hidden && !view->show_hidden) {
+                            item = item->next;
+                            continue;
+                        }
+                        
+                        // 换行处理（与绘制逻辑一致）
+                        if (draw_x > max_x) {
+                            draw_x = (int)view->viewport.x + 10;
+                            draw_y += view->item_height + 10;
+                        }
+                        
+                        // 检查点击是否在当前项目区域内
+                        if (x >= draw_x - 5 && x <= draw_x + view->item_width + 5 &&
+                            y >= draw_y - 5 && y <= draw_y + view->item_height + 5) {
+                            clicked_index = index;
+                            break;
+                        }
+                        
+                        // 移动到下一个位置
+                        draw_x += view->item_width + 10;
+                        index++;
+                        item = item->next;
                     }
                 } else {
                     // 列表视图或详细信息视图
@@ -1051,9 +1482,19 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                 
                 // 点击空白区域
                 if (event->button.button == SDL_BUTTON_LEFT) {
+                    // 如果正在编辑，取消编辑状态
+                    if (view->is_editing) {
+                        file_list_view_stop_editing(view, false);
+                        printf("点击空白区域，取消重命名\n");
+                    }
                     // 左键点击空白区域，取消选择
                     file_list_view_select_item(view, -1);
                 } else if (event->button.button == SDL_BUTTON_RIGHT) {
+                    // 如果正在编辑，取消编辑状态
+                    if (view->is_editing) {
+                        file_list_view_stop_editing(view, false);
+                        printf("右键点击空白区域，取消重命名\n");
+                    }
                     // 右键点击空白区域，显示空白区域右键菜单
                     file_list_view_select_item(view, -1);
                     if (view->on_right_click) {
@@ -1068,8 +1509,21 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
         }
         
         case SDL_EVENT_KEY_DOWN: {
+            // 如果正在编辑，优先处理编辑相关的键盘事件
+            if (view->is_editing) {
+                file_list_view_handle_key_input(view, event->key.scancode);
+                return true;
+            }
+            
             // 键盘事件
             switch (event->key.scancode) {
+                case SDL_SCANCODE_F2:
+                    // F2键开始重命名选中的文件
+                    if (view->selected_index >= 0) {
+                        file_list_view_start_editing(view, view->selected_index);
+                    }
+                    return true;
+                    
                 case SDL_SCANCODE_UP:
                     if (view->selected_index > 0) {
                         file_list_view_select_item(view, view->selected_index - 1);

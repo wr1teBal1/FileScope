@@ -9,6 +9,8 @@
 
 #include "context_menu.h"
 #include "renderer.h"
+#include "file_ops.h"
+#include "file_list.h"
 #include <string.h>
 
 // 菜单样式常量
@@ -109,8 +111,11 @@ static void create_blank_menu_items(ContextMenu *menu) {
         menu->items = NULL;
     }
     
+    // 检查剪贴板是否有数据来决定粘贴选项是否启用
+    bool paste_enabled = file_ops_has_clipboard_data();
+    
     // 添加菜单项
-    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Paste", ACTION_PASTE, true));
+    menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "Paste", ACTION_PASTE, paste_enabled));
     menu_add_item(menu, menu_item_new(MENU_ITEM_SEPARATOR, NULL, 0, false));
     menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "New Folder", ACTION_NEW_FOLDER, true));
     menu_add_item(menu, menu_item_new(MENU_ITEM_ACTION, "New File", ACTION_NEW_FILE, true));
@@ -169,6 +174,8 @@ ContextMenu* context_menu_new(struct Window *window) {
     menu->height = 0;
     menu->visible = false;
     menu->target_item = NULL;
+    menu->current_dir = NULL;
+    menu->file_list_view = NULL;
     
     return menu;
 }
@@ -181,6 +188,10 @@ void context_menu_free(ContextMenu *menu) {
     
     if (menu->items) {
         menu_item_free(menu->items);
+    }
+    
+    if (menu->current_dir) {
+        free(menu->current_dir);
     }
     
     free(menu);
@@ -377,52 +388,157 @@ void context_menu_execute_action(ContextMenu *menu, MenuAction action) {
             break;
             
         case ACTION_COPY:
-            printf("Executing action: Copy\n");
-            // TODO: 实现复制功能
+            if (menu->target_item && menu->target_item->path) {
+                if (file_ops_copy(menu->target_item->path)) {
+                    printf("File copied to clipboard: %s\n", menu->target_item->path);
+                } else {
+                    printf("Failed to copy file: %s\n", menu->target_item->path);
+                }
+            } else {
+                printf("No target file selected for copy\n");
+            }
             break;
             
         case ACTION_CUT:
-            printf("Executing action: Cut\n");
-            // TODO: 实现剪切功能
+            if (menu->target_item && menu->target_item->path) {
+                if (file_ops_cut(menu->target_item->path)) {
+                    printf("File cut to clipboard: %s\n", menu->target_item->path);
+                } else {
+                    printf("Failed to cut file: %s\n", menu->target_item->path);
+                }
+            } else {
+                printf("No target file selected for cut\n");
+            }
             break;
             
         case ACTION_PASTE:
-            printf("Executing action: Paste\n");
-            // TODO: 实现粘贴功能
+            if (file_ops_has_clipboard_data()) {
+                const char *target_dir = menu->current_dir ? menu->current_dir : ".";
+                if (file_ops_paste(target_dir)) {
+                    printf("File pasted successfully to: %s\n", target_dir);
+                    // TODO: 刷新文件列表
+                } else {
+                    printf("Failed to paste file to: %s\n", target_dir);
+                }
+            } else {
+                printf("No file in clipboard to paste\n");
+            }
             break;
             
         case ACTION_DELETE:
-            printf("Executing action: Delete\n");
-            // TODO: 实现删除功能
+            if (menu->target_item && menu->target_item->path) {
+                // 跳过 ".." 目录项
+                if (strcmp(menu->target_item->name, "..") == 0) {
+                    printf("Cannot delete parent directory entry\n");
+                    break;
+                }
+                
+                if (file_ops_delete(menu->target_item->path)) {
+                    printf("File deleted successfully: %s\n", menu->target_item->path);
+                    // TODO: 刷新文件列表
+                } else {
+                    printf("Failed to delete file: %s\n", menu->target_item->path);
+                }
+            } else {
+                printf("No target file selected for delete\n");
+            }
             break;
             
         case ACTION_RENAME:
-            printf("Executing action: Rename\n");
-            // TODO: 实现重命名功能
+            if (menu->target_item && menu->target_item->path) {
+                // 跳过 ".." 目录项
+                if (strcmp(menu->target_item->name, "..") == 0) {
+                    printf("Cannot rename parent directory entry\n");
+                    break;
+                }
+                
+                // 开始内联编辑重命名
+                if (menu->file_list_view && menu->file_list_view->files) {
+                    // 找到目标文件在可见文件列表中的索引
+                    int item_index = -1;
+                    int visible_index = 0;
+                    FileItem *current_item = menu->file_list_view->files->head;
+                    
+                    while (current_item) {
+                        // 只计算可见项目的索引
+                        if (!current_item->is_hidden || menu->file_list_view->show_hidden) {
+                            if (current_item == menu->target_item) {
+                                item_index = visible_index;
+                                break;
+                            }
+                            visible_index++;
+                        }
+                        current_item = current_item->next;
+                    }
+                    
+                    if (item_index >= 0) {
+                        printf("开始重命名文件: %s\n", menu->target_item->name);
+                        file_list_view_start_editing(menu->file_list_view, item_index);
+                    } else {
+                        printf("无法找到目标文件在列表中的位置\n");
+                    }
+                } else {
+                    printf("文件列表视图引用未设置\n");
+                }
+            } else {
+                printf("No target file selected for rename\n");
+            }
             break;
             
         case ACTION_PROPERTIES:
-            printf("Executing action: Properties\n");
-            // TODO: 实现属性对话框
+            if (menu->target_item && menu->target_item->path) {
+                printf("Showing properties for: %s\n", menu->target_item->path);
+                // TODO: 实现属性对话框
+            } else {
+                printf("No target file selected for properties\n");
+            }
             break;
             
         case ACTION_NEW_FOLDER:
-            printf("Executing action: New Folder\n");
-            // TODO: 实现新建文件夹功能
+            printf("New folder functionality requires UI input dialog\n");
+            // TODO: 实现新建文件夹对话框
             break;
             
         case ACTION_NEW_FILE:
-            printf("Executing action: New File\n");
-            // TODO: 实现新建文件功能
+            printf("New file functionality requires UI input dialog\n");
+            // TODO: 实现新建文件对话框
             break;
             
         case ACTION_REFRESH:
-            printf("Executing action: Refresh\n");
-            // TODO: 实现刷新功能
+            printf("Refresh functionality requires file list reference\n");
+            // TODO: 实现刷新当前目录功能
             break;
             
         default:
             printf("Unknown action: %d\n", action);
             break;
+    }
+}
+
+// 设置当前目录
+void context_menu_set_current_dir(ContextMenu *menu, const char *dir_path) {
+    if (!menu) {
+        return;
+    }
+    
+    // 释放旧的目录路径
+    if (menu->current_dir) {
+        free(menu->current_dir);
+        menu->current_dir = NULL;
+    }
+    
+    // 设置新的目录路径
+    if (dir_path) {
+        menu->current_dir = strdup(dir_path);
+        if (!menu->current_dir) {
+            printf("[ERROR] Failed to allocate memory for current directory\n");
+        }
+    }
+}
+
+// 设置文件列表视图引用
+void context_menu_set_file_list_view(ContextMenu *menu, struct FileListView *view) {
+    if (menu) {
+        menu->file_list_view = view;
     }
 }

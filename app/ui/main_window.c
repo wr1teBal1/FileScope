@@ -70,6 +70,9 @@ MainWindow* main_window_new(Window *a) {
         free(window);
         return NULL;
     }
+    
+    // 设置上下文菜单的文件列表视图引用
+    context_menu_set_file_list_view(window->context_menu, window->file_list_view);
 
     // 创建工具栏
     window->toolbar = toolbar_new(a);

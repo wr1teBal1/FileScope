@@ -48,6 +48,15 @@ typedef struct FileListView {
     SDL_Texture *file_icon;      // 文件图标
     RightClickCallback on_right_click;                  // 右键点击回调
     DirectoryChangedCallback on_directory_changed;      // 目录变更回调
+    
+    // 内联编辑相关
+    bool is_editing;             // 是否正在编辑
+    int editing_index;           // 正在编辑的项目索引
+    char *edit_buffer;           // 编辑缓冲区
+    size_t edit_buffer_size;     // 编辑缓冲区大小
+    size_t edit_cursor_pos;      // 光标位置
+    Uint32 last_blink_time;      // 上次光标闪烁时间
+    bool cursor_visible;         // 光标是否可见
 } FileListView;
 
 // 创建文件列表视图
@@ -100,5 +109,15 @@ void file_list_view_scroll(FileListView *view, int delta);
 
 // 加载图标
 bool file_list_view_load_icons(FileListView *view);
+
+// 设置右键点击回调
+void file_list_view_set_right_click_callback(FileListView *view, RightClickCallback callback);
+
+// 内联编辑相关函数
+void file_list_view_start_editing(FileListView *view, int index);
+void file_list_view_stop_editing(FileListView *view, bool save_changes);
+bool file_list_view_is_editing(FileListView *view);
+void file_list_view_handle_text_input(FileListView *view, const char *text);
+void file_list_view_handle_key_input(FileListView *view, SDL_Scancode scancode);
 
 #endif // FILE_LIST_H
