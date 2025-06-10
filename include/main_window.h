@@ -12,6 +12,7 @@ struct FileListView;
 struct Toolbar;
 typedef struct Toolbar Toolbar;
 struct Sidebar;
+typedef struct Sidebar Sidebar;
 struct ContextMenu;
 
 // 主窗口结构体
@@ -20,7 +21,7 @@ typedef struct MainWindow {
     FileListView *file_list_view;   // 文件列表视图
     ContextMenu *context_menu;      // 右键菜单
     Toolbar *toolbar;               // 工具栏
-//    Sidebar *sidebar;               // 侧边栏
+    Sidebar *sidebar;               // 侧边栏
 } MainWindow;
 
 // 主窗口函数声明

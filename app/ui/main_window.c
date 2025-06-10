@@ -43,6 +43,22 @@ static void on_directory_changed(FileListView *view, const char *path) {
     toolbar_notify_directory_changed(main_window->toolbar, path);
 }
 
+// 侧边栏项目选中回调函数
+static void on_sidebar_item_selected(Sidebar *sidebar, const char *path) {
+    if (!sidebar || !path) {
+        return;
+    }
+    
+    // 获取主窗口实例
+    MainWindow *main_window = (MainWindow*)sidebar->app->user_data;
+    if (!main_window || !main_window->file_list_view) {
+        return;
+    }
+    
+    // 加载选中的目录
+    file_list_view_load_directory(main_window->file_list_view, path);
+}
+
 // 创建主窗口
 MainWindow* main_window_new(Window *a) {
     if (!a) {
@@ -83,13 +99,23 @@ MainWindow* main_window_new(Window *a) {
         return NULL;
     }
 
-    // TODO: 创建侧边栏
-    // window->sidebar = sidebar_new(app);
+    // 创建侧边栏
+    window->sidebar = sidebar_new(a);
+    if (!window->sidebar) {
+        toolbar_free(window->toolbar);
+        context_menu_free(window->context_menu);
+        file_list_view_free(window->file_list_view);
+        free(window);
+        return NULL;
+    }
+    
+    // 设置侧边栏项目选中回调
+    sidebar_set_item_selected_callback(window->sidebar, on_sidebar_item_selected);
 
-    // 设置文件列表视图的视口区域
-    window->file_list_view->viewport.x = 0;
+    // 设置文件列表视图的视口区域（考虑侧边栏宽度）
+    window->file_list_view->viewport.x = SIDEBAR_WIDTH;
     window->file_list_view->viewport.y = TOOLBAR_HEIGHT;
-    window->file_list_view->viewport.w = SDL_WINDOW_WIDTH; // TODO: 考虑侧边栏宽度
+    window->file_list_view->viewport.w = SDL_WINDOW_WIDTH - SIDEBAR_WIDTH;
     window->file_list_view->viewport.h = SDL_WINDOW_HEIGHT - TOOLBAR_HEIGHT;
 
     // 设置用户数据，用于回调函数中获取主窗口实例
@@ -121,8 +147,10 @@ void main_window_free(MainWindow *window) {
     if (window->toolbar) {
         toolbar_free(window->toolbar);
     }
-    // TODO: 释放侧边栏
-    // if (window->sidebar) { sidebar_free(window->sidebar); }
+    // 释放侧边栏
+    if (window->sidebar) { 
+        sidebar_free(window->sidebar); 
+    }
 
     free(window);
 }
@@ -148,8 +176,10 @@ bool main_window_handle_event(MainWindow *window, SDL_Event *event) {
         return true;
     }
 
-    // TODO: 将事件传递给侧边栏处理
-    // if (sidebar_handle_event(window->sidebar, event)) { return true; }
+    // 将事件传递给侧边栏处理
+    if (window->sidebar && sidebar_handle_event(window->sidebar, event)) { 
+        return true; 
+    }
 
     return false;
 }
@@ -168,8 +198,10 @@ void main_window_draw(MainWindow *window) {
         toolbar_draw(window->toolbar);
     }
     
-    // TODO: 绘制侧边栏
-    // sidebar_draw(window->sidebar);
+    // 绘制侧边栏
+    if (window->sidebar) {
+        sidebar_draw(window->sidebar);
+    }
 
     // 绘制右键菜单（最后绘制，确保在最上层）
     context_menu_draw(window->context_menu);

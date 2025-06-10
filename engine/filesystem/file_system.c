@@ -9,6 +9,7 @@
  */
 
 #include "file_system.h"
+#include "sidebar.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -16,6 +17,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 // #include <pwd.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <shlobj.h>
+#endif
 
 // 当前错误码
 static FSError last_error = FS_ERROR_NONE;
@@ -677,4 +683,160 @@ char* fs_get_relative_path(const char *path, const char *base) {
     }
 
     return rel_path;
+}
+
+// 获取特殊文件夹路径
+bool get_special_folder_path(SpecialFolder folder, char *path, size_t path_size) {
+    if (!path || path_size == 0) {
+        return false;
+    }
+    
+    // 获取用户主目录
+    const char *home = getenv("HOME");
+    if (!home) {
+        home = getenv("USERPROFILE"); // Windows环境
+    }
+    
+    if (!home) {
+        return false;
+    }
+    
+    // 根据特殊文件夹类型拼接路径
+    switch (folder) {
+        case FOLDER_DESKTOP:
+            snprintf(path, path_size, "%s\\Desktop", home);
+            break;
+        case FOLDER_DOCUMENTS:
+            snprintf(path, path_size, "%s\\Documents", home);
+            break;
+        case FOLDER_DOWNLOADS:
+            snprintf(path, path_size, "%s\\Downloads", home);
+            break;
+        case FOLDER_MUSIC:
+            snprintf(path, path_size, "%s\\Music", home);
+            break;
+        case FOLDER_PICTURES:
+            snprintf(path, path_size, "%s\\Pictures", home);
+            break;
+        case FOLDER_VIDEOS:
+            snprintf(path, path_size, "%s\\Videos", home);
+            break;
+        default:
+            return false;
+    }
+    
+    // 检查路径是否存在
+    if (!fs_path_exists(path)) {
+        // 如果路径不存在，尝试使用Linux风格路径
+        switch (folder) {
+            case FOLDER_DESKTOP:
+                snprintf(path, path_size, "%s/Desktop", home);
+                break;
+            case FOLDER_DOCUMENTS:
+                snprintf(path, path_size, "%s/Documents", home);
+                break;
+            case FOLDER_DOWNLOADS:
+                snprintf(path, path_size, "%s/Downloads", home);
+                break;
+            case FOLDER_MUSIC:
+                snprintf(path, path_size, "%s/Music", home);
+                break;
+            case FOLDER_PICTURES:
+                snprintf(path, path_size, "%s/Pictures", home);
+                break;
+            case FOLDER_VIDEOS:
+                snprintf(path, path_size, "%s/Videos", home);
+                break;
+            default:
+                return false;
+        }
+        
+        // 再次检查路径是否存在
+        if (!fs_path_exists(path)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// 获取驱动器列表（Windows平台）
+int get_drives(DriveInfo *drives, int max_count) {
+    if (!drives || max_count <= 0) {
+        return 0;
+    }
+    
+#ifdef _WIN32
+    // Windows平台使用GetLogicalDriveStrings获取驱动器列表
+    char buffer[1024];
+    DWORD result = GetLogicalDriveStringsA(sizeof(buffer), buffer);
+    
+    if (result == 0 || result > sizeof(buffer)) {
+        return 0;
+    }
+    
+    int count = 0;
+    char *drive_ptr = buffer;
+    
+    while (*drive_ptr && count < max_count) {
+        // 获取驱动器盘符
+        drives[count].letter = drive_ptr[0];
+        
+        // 获取驱动器标签
+        char volume_name[256] = {0};
+        char fs_name[32] = {0};
+        DWORD serial_number = 0;
+        DWORD max_component_length = 0;
+        DWORD fs_flags = 0;
+        
+        char root_path[4] = {drive_ptr[0], ':', '\\', 0};
+        
+        if (GetVolumeInformationA(
+                root_path,
+                volume_name,
+                sizeof(volume_name),
+                &serial_number,
+                &max_component_length,
+                &fs_flags,
+                fs_name,
+                sizeof(fs_name))) {
+            strncpy(drives[count].label, volume_name, sizeof(drives[count].label) - 1);
+            strncpy(drives[count].fs_type, fs_name, sizeof(drives[count].fs_type) - 1);
+        }
+        
+        // 获取驱动器大小信息
+        ULARGE_INTEGER total_bytes, free_bytes;
+        if (GetDiskFreeSpaceExA(
+                root_path,
+                NULL,
+                &total_bytes,
+                &free_bytes)) {
+            drives[count].total_size = total_bytes.QuadPart;
+            drives[count].free_size = free_bytes.QuadPart;
+        }
+        
+        // 判断是否为可移动设备
+        drives[count].is_removable = (GetDriveTypeA(root_path) == DRIVE_REMOVABLE);
+        
+        count++;
+        
+        // 移动到下一个驱动器
+        while (*drive_ptr) drive_ptr++;
+        drive_ptr++;
+    }
+    
+    return count;
+#else
+    // 非Windows平台，仅返回根目录
+    if (max_count > 0) {
+        drives[0].letter = '/';
+        strncpy(drives[0].label, "Root", sizeof(drives[0].label) - 1);
+        strncpy(drives[0].fs_type, "Unknown", sizeof(drives[0].fs_type) - 1);
+        drives[0].total_size = 0;
+        drives[0].free_size = 0;
+        drives[0].is_removable = false;
+        return 1;
+    }
+    return 0;
+#endif
 }

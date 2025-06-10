@@ -23,6 +23,16 @@
         "compare": "c",
         "limits": "c",
         "renderer.h": "c",
-        "sdl_blendmode.h": "c"
+        "sdl_blendmode.h": "c",
+        "file_system.h": "c",
+        "file_list.h": "c",
+        "file_item.h": "c",
+        "windows.h": "c",
+        "sidebar.h": "c",
+        "string.h": "c",
+        "cstdint": "c",
+        "*.rh": "c",
+        "limits.h": "c",
+        "file_ops.h": "c"
     }
 }
