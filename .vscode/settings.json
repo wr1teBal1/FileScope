@@ -33,6 +33,9 @@
         "cstdint": "c",
         "*.rh": "c",
         "limits.h": "c",
-        "file_ops.h": "c"
+        "file_ops.h": "c",
+        "xtr1common": "c",
+        "stat.h": "c",
+        "shellapi.h": "c"
     }
 }

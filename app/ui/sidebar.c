@@ -10,6 +10,7 @@
 #include "sidebar.h"
 #include "renderer.h"
 #include "file_system.h"
+#include "toolbar.h"
 #include <stdlib.h>
 #include <string.h>
 #include <SDL3_image/SDL_image.h>
@@ -44,9 +45,9 @@ Sidebar* sidebar_new(struct Window *app) {
 
     sidebar->app = app;
     sidebar->rect.x = 0;
-    sidebar->rect.y = 0;
+    sidebar->rect.y = TOOLBAR_HEIGHT; // 从工具栏底部开始
     sidebar->rect.w = SIDEBAR_WIDTH;
-    sidebar->rect.h = SDL_WINDOW_HEIGHT;
+    sidebar->rect.h = SDL_WINDOW_HEIGHT - TOOLBAR_HEIGHT; // 调整高度，减去工具栏高度
     sidebar->item_count = 0;
     sidebar->selected_index = -1;
     sidebar->hover_index = -1;

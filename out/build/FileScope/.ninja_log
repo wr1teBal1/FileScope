@@ -1,0 +1,27 @@
+# ninja log v6
+7	1515	7713343200386507	CMakeFiles/FileScope.dir/main.c.obj	42e7c3eb1a77e30d
+63	1623	7713343201003374	CMakeFiles/FileScope.dir/app/controllers/file_ops.c.obj	2600cf347bd9505e
+129	1705	7713343201673290	CMakeFiles/FileScope.dir/app/controllers/view_ctrl.c.obj	f77beda7d365695e
+196	1793	7713343202356888	CMakeFiles/FileScope.dir/app/models/file_item.c.obj	54509f0041a0cc74
+265	1868	7713343203013469	CMakeFiles/FileScope.dir/app/ui/file_list.c.obj	f161b92c5b4817c5
+341	1967	7713343203672403	CMakeFiles/FileScope.dir/app/ui/main_window.c.obj	8aa623831ba3d65f
+446	2067	7713343204844294	CMakeFiles/FileScope.dir/app/ui/context_menu.c.obj	df0ecc3e62c50bb4
+526	2163	7713343205668078	CMakeFiles/FileScope.dir/app/ui/sidebar.c.obj	82f0467f778a49d8
+622	2164	7713343206596759	CMakeFiles/FileScope.dir/app/ui/toolbar.c.obj	bb7bd23f300287a1
+698	2165	7713343207333713	CMakeFiles/FileScope.dir/app/app.c.obj	85f7e8d709990ee9
+781	2166	7713343208201606	CMakeFiles/FileScope.dir/engine/cache/thumbnail.c.obj	ed8b3d8837ba40a
+971	2167	7713343210105382	CMakeFiles/FileScope.dir/engine/filesystem/file_watcher.c.obj	6789bf2946d59ea5
+1081	2168	7713343211116986	CMakeFiles/FileScope.dir/engine/filesystem/path_resolver.c.obj	2e1e97fd2d126429
+1187	2169	7713343212122096	CMakeFiles/FileScope.dir/engine/render/icon_cache.c.obj	f76a7b21503fb24a
+1269	2170	7713343212973522	CMakeFiles/FileScope.dir/engine/render/ui_renderer.c.obj	c4bc915806ce571
+1349	2171	7713343213839243	CMakeFiles/FileScope.dir/engine/utils/sort.c.obj	2af643e22f6fe523
+1426	2172	7713343214663440	CMakeFiles/FileScope.dir/engine/utils/string_utils.c.obj	34f569034985ba88
+1520	2173	7713343215567663	CMakeFiles/FileScope.dir/platform/sdl/events.c.obj	cd52368c460affbe
+1624	2174	7713343216629717	CMakeFiles/FileScope.dir/platform/sdl/init_sdl.c.obj	a2e4c7778284240a
+1705	2175	7713343217347100	CMakeFiles/FileScope.dir/platform/sdl/renderer.c.obj	26b43eaff23bd44c
+1873	2204	7713343219129219	CMakeFiles/FileScope.dir/platform/system/clipboard.c.obj	f29725ab07f33eb1
+1794	2273	7713343218334993	CMakeFiles/FileScope.dir/platform/sdl/window.c.obj	e76fc3dc32c72e51
+1967	2301	7713343219988263	CMakeFiles/FileScope.dir/platform/system/fs_api.c.obj	3b7075ed8d2294f
+2068	2364	7713343221079813	CMakeFiles/FileScope.dir/platform/system/theme.c.obj	3e36e4802fffd6f4
+869	2510	7713343209092156	CMakeFiles/FileScope.dir/engine/filesystem/file_system.c.obj	cb0818dc17b9ad5
+2510	2933	7713343225494267	FileScope.exe	61c7ba5f56b236be
