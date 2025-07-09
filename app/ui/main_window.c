@@ -13,6 +13,12 @@
 #include "renderer.h"
 #include "context_menu.h"
 #include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 260  // Windows默认最大路径长度
+#endif
 
 // 右键点击回调函数
 static void on_file_list_right_click(FileListView *view, int x, int y, FileItem *item) {
@@ -55,8 +61,19 @@ static void on_sidebar_item_selected(Sidebar *sidebar, const char *path) {
         return;
     }
     
+    // 处理驱动器路径格式转换
+    char actual_path[PATH_MAX];
+    if (strlen(path) == 2 && path[1] == ':') {
+        // 如果是驱动器路径格式（如"E:"），转换为"E:\\"
+        snprintf(actual_path, sizeof(actual_path), "%s\\", path);
+    } else {
+        // 其他路径直接使用
+        strncpy(actual_path, path, sizeof(actual_path) - 1);
+        actual_path[sizeof(actual_path) - 1] = '\0';
+    }
+    
     // 加载选中的目录
-    file_list_view_load_directory(main_window->file_list_view, path);
+    file_list_view_load_directory(main_window->file_list_view, actual_path);
 }
 
 // 创建主窗口

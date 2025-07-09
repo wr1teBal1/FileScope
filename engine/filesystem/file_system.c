@@ -791,17 +791,28 @@ int get_drives(DriveInfo *drives, int max_count) {
         
         char root_path[4] = {drive_ptr[0], ':', '\\', 0};
         
-        if (GetVolumeInformationA(
-                root_path,
-                volume_name,
-                sizeof(volume_name),
+        // 使用Unicode版本的API来正确处理中文标签
+        wchar_t volume_name_w[256] = {0};
+        wchar_t fs_name_w[32] = {0};
+        wchar_t root_path_w[4];
+        
+        // 转换路径为宽字符
+        MultiByteToWideChar(CP_ACP, 0, root_path, -1, root_path_w, 4);
+        
+        if (GetVolumeInformationW(
+                root_path_w,
+                volume_name_w,
+                sizeof(volume_name_w) / sizeof(wchar_t),
                 &serial_number,
                 &max_component_length,
                 &fs_flags,
-                fs_name,
-                sizeof(fs_name))) {
-            strncpy(drives[count].label, volume_name, sizeof(drives[count].label) - 1);
-            strncpy(drives[count].fs_type, fs_name, sizeof(drives[count].fs_type) - 1);
+                fs_name_w,
+                sizeof(fs_name_w) / sizeof(wchar_t))) {
+            // 转换Unicode字符串为UTF-8
+            WideCharToMultiByte(CP_UTF8, 0, volume_name_w, -1, 
+                               drives[count].label, sizeof(drives[count].label), NULL, NULL);
+            WideCharToMultiByte(CP_UTF8, 0, fs_name_w, -1, 
+                               drives[count].fs_type, sizeof(drives[count].fs_type), NULL, NULL);
         }
         
         // 获取驱动器大小信息
