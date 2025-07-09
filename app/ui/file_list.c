@@ -529,8 +529,9 @@ void file_list_view_draw(FileListView *view) {
                     }
                 } else {
                     // 正常绘制文件名
-                    size_t name_len = strlen(item->name);
-                    SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
+                    const char *display_text = item->display_name ? item->display_name : item->name;
+                    size_t name_len = strlen(display_text);
+                    SDL_Surface *text_surface = TTF_RenderText_Blended(font, display_text, name_len, current_text_color);
                     if (text_surface) {
                         SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
                         if (text_texture) {
@@ -775,8 +776,9 @@ void file_list_view_draw(FileListView *view) {
                     }
                 } else {
                     // 正常绘制文件名
-                    size_t name_len = strlen(item->name);
-                    SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->name, name_len, current_text_color);
+                    const char *display_text = item->display_name ? item->display_name : item->name;
+                    size_t name_len = strlen(display_text);
+                    SDL_Surface *text_surface = TTF_RenderText_Blended(font, display_text, name_len, current_text_color);
                     if (text_surface) {
                         SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
                         if (text_texture) {

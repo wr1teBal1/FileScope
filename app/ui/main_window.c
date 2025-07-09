@@ -112,18 +112,17 @@ MainWindow* main_window_new(Window *a) {
     // 设置侧边栏项目选中回调
     sidebar_set_item_selected_callback(window->sidebar, on_sidebar_item_selected);
 
-    // 设置文件列表视图的视口区域（考虑侧边栏宽度）
-    window->file_list_view->viewport.x = SIDEBAR_WIDTH;
-    window->file_list_view->viewport.y = TOOLBAR_HEIGHT;
-    window->file_list_view->viewport.w = SDL_WINDOW_WIDTH - SIDEBAR_WIDTH;
-    window->file_list_view->viewport.h = SDL_WINDOW_HEIGHT - TOOLBAR_HEIGHT;
-
     // 设置用户数据，用于回调函数中获取主窗口实例
     a->user_data = window;
     
     // 设置回调函数
     window->file_list_view->on_right_click = on_file_list_right_click;
     window->file_list_view->on_directory_changed = on_directory_changed;
+    
+    // 获取当前窗口大小并设置初始布局
+    int window_width, window_height;
+    SDL_GetWindowSize(a->window, &window_width, &window_height);
+    main_window_resize(window, window_width, window_height);
     
     // 加载默认目录
     file_list_view_load_directory(window->file_list_view, "."); // TODO: 加载用户主目录或上次打开的目录
@@ -205,4 +204,41 @@ void main_window_draw(MainWindow *window) {
 
     // 绘制右键菜单（最后绘制，确保在最上层）
     context_menu_draw(window->context_menu);
+}
+
+// 窗口大小调整函数
+void main_window_resize(MainWindow *window, int width, int height) {
+    if (!window || !window->app) {
+        return;
+    }
+    
+    printf("[DEBUG] Resizing main window to %dx%d\n", width, height);
+    
+    // 更新文件列表视图的视口区域
+    if (window->file_list_view) {
+        window->file_list_view->viewport.x = SIDEBAR_WIDTH;
+        window->file_list_view->viewport.y = TOOLBAR_HEIGHT;
+        window->file_list_view->viewport.w = width - SIDEBAR_WIDTH;
+        window->file_list_view->viewport.h = height - TOOLBAR_HEIGHT;
+        
+        printf("[DEBUG] File list viewport: x=%d, y=%d, w=%d, h=%d\n", 
+               window->file_list_view->viewport.x, window->file_list_view->viewport.y,
+               window->file_list_view->viewport.w, window->file_list_view->viewport.h);
+    }
+    
+    // 更新工具栏区域
+    if (window->toolbar) {
+        window->toolbar->rect.x = 0;
+        window->toolbar->rect.y = 0;
+        window->toolbar->rect.w = width;
+        window->toolbar->rect.h = TOOLBAR_HEIGHT;
+    }
+    
+    // 更新侧边栏区域
+    if (window->sidebar) {
+        window->sidebar->rect.x = 0;
+        window->sidebar->rect.y = TOOLBAR_HEIGHT;
+        window->sidebar->rect.w = SIDEBAR_WIDTH;
+        window->sidebar->rect.h = height - TOOLBAR_HEIGHT;
+    }
 }

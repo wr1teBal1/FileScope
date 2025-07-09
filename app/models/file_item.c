@@ -13,6 +13,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 
 // 创建文件项
 FileItem* file_item_new(const char *path) {
@@ -37,7 +41,34 @@ FileItem* file_item_new(const char *path) {
     const char *filename = fs_get_filename(path);
     if (filename) {
         item->name = strdup(filename);
+        
+#ifdef _WIN32
+        // Windows下将文件名从系统编码转换为UTF-8用于显示
+        char utf8_name[MAX_PATH * 3];
+        int result = MultiByteToWideChar(CP_ACP, 0, filename, -1, NULL, 0);
+        if (result > 0) {
+            wchar_t *wide_name = malloc(result * sizeof(wchar_t));
+            if (wide_name) {
+                MultiByteToWideChar(CP_ACP, 0, filename, -1, wide_name, result);
+                
+                int utf8_len = WideCharToMultiByte(CP_UTF8, 0, wide_name, -1, NULL, 0, NULL, NULL);
+                if (utf8_len > 0 && utf8_len <= sizeof(utf8_name)) {
+                    WideCharToMultiByte(CP_UTF8, 0, wide_name, -1, utf8_name, utf8_len, NULL, NULL);
+                    item->display_name = strdup(utf8_name);
+                } else {
+                    item->display_name = strdup(filename); // 备用方案
+                }
+                free(wide_name);
+            } else {
+                item->display_name = strdup(filename); // 备用方案
+            }
+        } else {
+            item->display_name = strdup(filename); // 备用方案
+        }
+#else
+        // Unix/Linux系统通常已经是UTF-8编码
         item->display_name = strdup(filename);
+#endif
     } else {
         item->name = strdup(path);
         item->display_name = strdup(path);
@@ -173,7 +204,7 @@ bool file_list_load_directory(FileList *list, const char *dir_path) {
             continue;
         }
 
-        // 构建完整路径
+        // 构建完整路径 - 使用原始文件名进行文件系统操作
         char *full_path = fs_combine_path(dir_path, entry->d_name);
         if (!full_path) {
             continue;

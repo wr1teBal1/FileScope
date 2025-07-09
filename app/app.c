@@ -49,6 +49,28 @@ void app_run(struct Window *window, MainWindow *main_window) {
                 break;
             }
             
+            // 处理窗口事件
+            if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                printf("[DEBUG] Window resized to %dx%d\n", 
+                       event.window.data1, event.window.data2);
+                window->config.window_width = event.window.data1;
+                window->config.window_height = event.window.data2;
+                
+                // 调用主窗口大小调整函数
+                main_window_resize(main_window, event.window.data1, event.window.data2);
+            } else if (event.type == SDL_EVENT_WINDOW_MOVED) {
+                printf("[DEBUG] Window moved to (%d,%d)\n", 
+                       event.window.data1, event.window.data2);
+                window->config.window_x = event.window.data1;
+                window->config.window_y = event.window.data2;
+            } else if (event.type == SDL_EVENT_WINDOW_MAXIMIZED) {
+                printf("[DEBUG] Window maximized\n");
+                window->config.window_maximized = true;
+            } else if (event.type == SDL_EVENT_WINDOW_RESTORED) {
+                printf("[DEBUG] Window restored\n");
+                window->config.window_maximized = false;
+            }
+            
             // 将事件传递给主窗口处理
             main_window_handle_event(main_window, &event);
         }

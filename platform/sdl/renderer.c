@@ -59,23 +59,58 @@ bool window_load_media(struct Window *a) {
     a->background = NULL;
     
     //加载字体
-    a->font = TTF_OpenFont("fonts/msyh.ttf", TEXT_SIZE); 
+    // 尝试多个可能的字体路径
+    const char* font_paths[] = {
+        "fonts/msyh.ttf",
+        "./fonts/msyh.ttf",
+        "../fonts/msyh.ttf",
+        "fonts/msyh.ttf"
+    };
+    
+    a->font = NULL;
+    for (int i = 0; i < sizeof(font_paths)/sizeof(font_paths[0]); i++) {
+        a->font = TTF_OpenFont(font_paths[i], TEXT_SIZE);
+        if (a->font) {
+            printf("Font loaded successfully from: %s\n", font_paths[i]);
+            break;
+        }
+    }
+    
     if (!a->font) {
-        fprintf(stderr, "Unable to load font: %s\n", SDL_GetError()); 
-        return false;
+        fprintf(stderr, "Unable to load font from any path. Error: %s\n", SDL_GetError()); 
+        // 尝试使用系统默认字体
+        a->font = TTF_OpenFont("C:/Windows/Fonts/msyh.ttc", TEXT_SIZE);
+        if (!a->font) {
+            a->font = TTF_OpenFont("C:/Windows/Fonts/simsun.ttc", TEXT_SIZE);
+        }
+        if (!a->font) {
+            fprintf(stderr, "Unable to load any font, including system fonts\n");
+            return false;
+        } else {
+            printf("Using system font as fallback\n");
+        }
     } 
     return true;  
 }
  
 bool ttf_show(struct Window *a,const char* str,SDL_Color color){
-    SDL_Surface *surf = TTF_RenderText_Blended(a->font, str,0, color);
+    if (!a || !a->font || !str) {
+        return false;
+    }
+    
+    // 释放之前的文本纹理
+    if (a->text_image) {
+        SDL_DestroyTexture(a->text_image);
+        a->text_image = NULL;
+    }
+    
+    SDL_Surface *surf = TTF_RenderText_Blended(a->font, str, strlen(str), color);
     if (!surf) {
         fprintf(stderr, "Unable to create surface: %s\n", SDL_GetError());
         return false;
     }
     a->text_image = SDL_CreateTextureFromSurface(a->renderer, surf);
-    // SDL_DestroySurface(surf); 
-    surf = NULL;
+    SDL_DestroySurface(surf); 
     if (!a->text_image) {
         fprintf(stderr, "Unable to  create texture: %s\n", SDL_GetError());
         return false;

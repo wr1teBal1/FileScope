@@ -29,5 +29,6 @@ MainWindow* main_window_new(struct Window *app);
 void main_window_free(MainWindow *window);
 bool main_window_handle_event(MainWindow *window, SDL_Event *event);
 void main_window_draw(MainWindow *window);
+void main_window_resize(MainWindow *window, int width, int height);
 
 #endif // MAIN_WINDOW_H

@@ -1,4 +1,5 @@
 #include "init_sdl.h"
+#include "config.h"
 
 
 // SDL初始化
@@ -13,12 +14,35 @@ bool window_init_sdl(struct Window *a){
         fprintf(stderr, "Unable to initialize SDL_ttf: %s\n", SDL_GetError());
         return false; 
     }
-    // 创建SDL窗口
-    a->window = SDL_CreateWindow(SDL_WINDOW_TITLE, SDL_WINDOW_WIDTH, SDL_WINDOW_HEIGHT, 0);
+    
+    // 加载配置
+    if (!config_load(&a->config)) {
+        fprintf(stderr, "Failed to load config, using defaults\n");
+    }
+    
+    // 创建SDL窗口，设置为可调整大小
+    a->window = SDL_CreateWindow(SDL_WINDOW_TITLE, 
+                                a->config.window_width, 
+                                a->config.window_height, 
+                                SDL_WINDOW_RESIZABLE);
     if (!a->window) {
         fprintf(stderr, "Unable to create window: %s\n", SDL_GetError());
         return false;
     }
+    
+    // 设置窗口位置
+    if (a->config.window_x != SDL_WINDOWPOS_CENTERED && 
+        a->config.window_y != SDL_WINDOWPOS_CENTERED) {
+        SDL_SetWindowPosition(a->window, a->config.window_x, a->config.window_y);
+    }
+    
+    // 如果之前是最大化状态，则最大化窗口
+    if (a->config.window_maximized) {
+        SDL_MaximizeWindow(a->window);
+    }
+    
+    // 初始化调整大小状态
+    a->is_resizing = false;
     // 创建SDL渲染器
     a->renderer = SDL_CreateRenderer(a->window, NULL);
      //创建渲染器

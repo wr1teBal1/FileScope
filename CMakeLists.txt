@@ -20,6 +20,7 @@ add_executable(FileScope
     engine/render/ui_renderer.c
     engine/utils/sort.c
     engine/utils/string_utils.c
+    engine/utils/config.c
     platform/sdl/events.c
     platform/sdl/init_sdl.c
     platform/sdl/renderer.c

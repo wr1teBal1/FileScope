@@ -2,6 +2,7 @@
 #define WINDOW_H
 
 #include "main.h"
+#include "config.h"
 
 
 
@@ -23,6 +24,10 @@ typedef struct Window {
     bool is_running;
     // 用户数据指针
     void *user_data;
+    // 应用程序配置
+    AppConfig config;
+    // 窗口大小调整状态
+    bool is_resizing;
 
 }Window;//quanuj
 

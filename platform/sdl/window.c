@@ -10,6 +10,7 @@
 #include "window.h"
 #include "init_sdl.h"
 #include "renderer.h"
+#include "config.h"
  
 
 
@@ -18,6 +19,12 @@
 void window_free(struct Window **app) {
     if (*app){
         struct Window *a = *app;
+        
+        // 保存当前窗口配置
+        if (a->window) {
+            config_update_from_window(&a->config, a->window);
+            config_save(&a->config);
+        }
         // 释放SDL文字纹理
         if (a->text_image) {
             SDL_DestroyTexture(a->text_image);
