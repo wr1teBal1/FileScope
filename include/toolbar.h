@@ -47,6 +47,11 @@ typedef struct Toolbar {
     int history_capacity;      // 历史记录容量
     int history_count;         // 历史记录数量
     int history_index;         // 当前历史记录索引
+
+    // 搜索相关
+    char search_text[256];     // 搜索输入内容
+    bool search_active;        // 是否处于搜索输入状态
+    int search_cursor_pos;     // 光标位置
 } Toolbar;
 
 // 工具栏基本函数声明
@@ -72,5 +77,11 @@ bool toolbar_search(Toolbar *toolbar, const char *search_term);
 // 设置按钮状态
 void toolbar_set_button_enabled(Toolbar *toolbar, ToolbarButtonType button_type, bool enabled);
 void toolbar_update_button_states(Toolbar *toolbar);
+
+// 搜索相关API
+void toolbar_search_start(Toolbar *toolbar);
+void toolbar_search_stop(Toolbar *toolbar);
+void toolbar_search_handle_text(Toolbar *toolbar, const char *text);
+void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode);
 
 #endif // TOOLBAR_H

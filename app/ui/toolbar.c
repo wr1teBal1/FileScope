@@ -13,6 +13,7 @@
 #include <string.h>
 #include <math.h>
 #include "main_window.h"
+#include <SDL3_ttf/SDL_ttf.h> // 确保加上
 // #include "toolbar.h"
 // #include "renderer.h"
 // #include "file_list.h"
@@ -592,6 +593,10 @@ Toolbar* toolbar_new(struct Window *app) {
     
     toolbar->history_count = 0;
     toolbar->history_index = -1;
+
+    toolbar->search_text[0] = '\0';// 搜索文本
+    toolbar->search_active = false;// 搜索是否激活
+    toolbar->search_cursor_pos = 0;// 搜索光标位置
     
     return toolbar;
 }
@@ -714,9 +719,7 @@ void toolbar_draw(Toolbar *toolbar) {
     if (!toolbar || !toolbar->app || !toolbar->app->renderer) {
         return;
     }
-    
     SDL_Renderer *renderer = toolbar->app->renderer;
-    
     // 绘制工具栏背景
     SDL_SetRenderDrawColor(renderer, TOOLBAR_BG_COLOR.r, TOOLBAR_BG_COLOR.g, TOOLBAR_BG_COLOR.b, TOOLBAR_BG_COLOR.a);
     SDL_FRect toolbar_frect = {
@@ -726,14 +729,101 @@ void toolbar_draw(Toolbar *toolbar) {
         (float)toolbar->rect.h
     };
     SDL_RenderFillRect(renderer, &toolbar_frect);
-    
     // 绘制工具栏边框
     SDL_SetRenderDrawColor(renderer, BUTTON_BORDER_COLOR.r, BUTTON_BORDER_COLOR.g, BUTTON_BORDER_COLOR.b, BUTTON_BORDER_COLOR.a);
     SDL_RenderRect(renderer, &toolbar_frect);
-    
     // 绘制工具栏按钮
     for (int i = 0; i < toolbar->button_count; i++) {
         draw_toolbar_button(toolbar, &toolbar->buttons[i]);
+    }
+    // 绘制搜索输入框（右侧，边界分明）
+    int search_box_w = 220;
+    int search_box_h = BUTTON_SIZE;
+    int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING;
+    int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2;
+    SDL_FRect search_box = {
+        (float)search_box_x, (float)search_box_y, (float)search_box_w, (float)search_box_h
+    };
+    // 背景
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &search_box);
+    // 边框
+    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_RenderRect(renderer, &search_box);
+    // 显示输入内容`
+    if (toolbar->search_active || toolbar->search_text[0] != '\0') {
+        // 这里只做简单文本渲染，实际可用TTF渲染
+        SDL_Color text_color = {30, 30, 30, 255};
+        if (toolbar->app->font && toolbar->search_text[0] != '\0') {
+            size_t text_len = strlen(toolbar->search_text);
+            SDL_Surface *text_surface = TTF_RenderText_Blended(toolbar->app->font, toolbar->search_text, text_len, text_color);
+            if (text_surface) {
+                SDL_Texture *text_tex = SDL_CreateTextureFromSurface(renderer, text_surface);
+                if (text_tex) {
+                    SDL_FRect dst = {(float)(search_box_x + 8), (float)(search_box_y + (search_box_h - text_surface->h) / 2), (float)text_surface->w, (float)text_surface->h};
+                    SDL_RenderTexture(renderer, text_tex, NULL, &dst);
+                    SDL_DestroyTexture(text_tex);
+                }
+                SDL_DestroySurface(text_surface);
+            }
+        }
+    } else {
+        // 显示placeholder
+        SDL_Color ph_color = {180, 180, 180, 255};
+        if (toolbar->app->font) {
+            size_t ph_len = strlen("搜索...");
+            SDL_Surface *ph_surface = TTF_RenderText_Blended(toolbar->app->font, "搜索...", ph_len, ph_color);
+            if (ph_surface) {
+                SDL_Texture *ph_tex = SDL_CreateTextureFromSurface(renderer, ph_surface);
+                if (ph_tex) {
+                    SDL_FRect dst = {(float)(search_box_x + 8), (float)(search_box_y + (search_box_h - ph_surface->h) / 2), (float)ph_surface->w, (float)ph_surface->h};
+                    SDL_RenderTexture(renderer, ph_tex, NULL, &dst);
+                    SDL_DestroyTexture(ph_tex);
+                }
+                SDL_DestroySurface(ph_surface);
+            }
+        }
+    }
+}
+
+void toolbar_search_start(Toolbar *toolbar) {
+    if (!toolbar) return;
+    toolbar->search_active = true;
+    toolbar->search_text[0] = '\0';
+    toolbar->search_cursor_pos = 0;
+}
+void toolbar_search_stop(Toolbar *toolbar) {
+    if (!toolbar) return;
+    toolbar->search_active = false;
+}
+void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
+    if (!toolbar || !toolbar->search_active || !text) return;
+    size_t len = strlen(toolbar->search_text);
+    size_t tlen = strlen(text);
+    if (len + tlen < sizeof(toolbar->search_text) - 1) {
+        strcat(toolbar->search_text, text);
+        toolbar->search_cursor_pos += tlen;
+    }
+}
+void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
+    if (!toolbar || !toolbar->search_active) return;
+    size_t len = strlen(toolbar->search_text);
+    switch (scancode) {
+        case SDL_SCANCODE_BACKSPACE:
+            if (toolbar->search_cursor_pos > 0 && len > 0) {
+                toolbar->search_text[toolbar->search_cursor_pos-1] = '\0';
+                toolbar->search_cursor_pos--;
+            }
+            break;
+        case SDL_SCANCODE_RETURN:
+            // TODO: 触发搜索
+            toolbar_search_stop(toolbar);
+            break;
+        case SDL_SCANCODE_ESCAPE:
+            toolbar_search_stop(toolbar);
+            break;
+        default:
+            break;
     }
 }
 
