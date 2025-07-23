@@ -36,6 +36,10 @@
         "file_ops.h": "c",
         "xtr1common": "c",
         "stat.h": "c",
-        "shellapi.h": "c"
+        "shellapi.h": "c",
+        "stdlib.h": "c",
+        "unistd.h": "c",
+        "context_menu.h": "c",
+        "stdio.h": "c"
     }
 }

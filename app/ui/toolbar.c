@@ -13,7 +13,12 @@
 #include <string.h>
 #include <math.h>
 #include "main_window.h"
-
+// #include "toolbar.h"
+// #include "renderer.h"
+// #include "file_list.h"
+// #include <string.h>
+// #include <math.h>
+// #include "main_window.h"
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -102,43 +107,62 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
             break;
             
         case BUTTON_UP:
-            // 绘制上一级箭头
+            // 绘制上一级箭头（闭合三角形+精确箭杆连接）
             {
-                SDL_FPoint points[3] = {
-                    {(float)(icon_x + icon_size / 2), (float)icon_y},
-                    {(float)icon_x, (float)(icon_y + icon_size / 2)},
-                    {(float)(icon_x + icon_size), (float)(icon_y + icon_size / 2)}
+                float top_x = icon_x + icon_size / 2.0f;
+                float top_y = icon_y;
+                float left_x = icon_x;
+                float left_y = icon_y + icon_size / 2.0f;
+                float right_x = icon_x + icon_size;
+                float right_y = icon_y + icon_size / 2.0f;
+                float mid_x = icon_x + icon_size / 2.0f;
+                float mid_y = icon_y + icon_size / 2.0f;
+                float shaft_bottom_y = icon_y + icon_size - 2;
+
+                // 闭合三角形
+                SDL_FPoint triangle[4] = {
+                    {top_x, top_y},
+                    {left_x, left_y},
+                    {right_x, right_y},
+                    {top_x, top_y}
                 };
-                SDL_RenderLines(renderer, points, 3);
-                SDL_FRect line = {
-                    (float)(icon_x + icon_size / 2),
-                    (float)(icon_y + icon_size / 2),
-                    1.0f,
-                    (float)(icon_size / 2)
-                };
-                SDL_RenderFillRect(renderer, &line);
+                SDL_RenderLines(renderer, triangle, 4);
+                // 箭杆与底边中点无缝连接
+                SDL_RenderLine(renderer, mid_x, mid_y, mid_x, shaft_bottom_y);
             }
-            break;//有问题
+            break;
             
         case BUTTON_HOME:
-            // 绘制主目录图标 (简化的房子)
+            // 绘制主目录图标 (闭合屋顶三角形+房屋主体与屋檐底边重合)
             {
-                SDL_FPoint roof[3] = {
-                    {(float)(icon_x + icon_size / 2), (float)icon_y},
-                    {(float)icon_x, (float)(icon_y + icon_size / 2)},
-                    {(float)(icon_x + icon_size), (float)(icon_y + icon_size / 2)}
+                // 屋顶三角形
+                float roof_top_x = icon_x + icon_size / 2.0f;
+                float roof_top_y = icon_y;
+                float roof_left_x = icon_x;
+                float roof_left_y = icon_y + icon_size / 2.5f;
+                float roof_right_x = icon_x + icon_size;
+                float roof_right_y = icon_y + icon_size / 2.5f;
+                SDL_FPoint roof[4] = {
+                    {roof_top_x, roof_top_y},
+                    {roof_left_x, roof_left_y},
+                    {roof_right_x, roof_right_y},
+                    {roof_top_x, roof_top_y}
                 };
-                SDL_RenderLines(renderer, roof, 3);
-                
-                SDL_FRect house = {
-                    (float)(icon_x + icon_size / 4), 
-                    (float)(icon_y + icon_size / 2), 
-                    (float)(icon_size / 2), 
-                    (float)(icon_size / 2)
-                };
+                SDL_RenderLines(renderer, roof, 4);
+
+                // 房屋主体（顶部与屋檐底边重合）
+                float house_x = roof_left_x + (roof_right_x - roof_left_x) / 4.0f;
+                float house_w = (roof_right_x - roof_left_x) / 2.0f;
+                float house_y = roof_left_y; // 顶部与屋檐底边重合
+                float house_h = icon_size - (house_y - icon_y) - 2;
+                SDL_FRect house = {house_x, house_y, house_w, house_h};
                 SDL_RenderRect(renderer, &house);
+
+                // 屋顶与房屋主体连接线（左右两侧）
+                SDL_RenderLine(renderer, roof_left_x, roof_left_y, house_x, house_y);
+                SDL_RenderLine(renderer, roof_right_x, roof_right_y, house_x + house_w, house_y);
             }
-            break;//有问题
+            break;
             
         case BUTTON_REFRESH:
             // 绘制刷新图标 (圆形)
