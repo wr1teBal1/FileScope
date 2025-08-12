@@ -8,7 +8,7 @@
 
 // 文件类型枚举
 typedef enum {
-    FILE_TYPE_UNKNOWN,
+    FILE_TYPE_UNKNOWN,// 未知类型
     FILE_TYPE_REGULAR,// 普通文件
     FILE_TYPE_DIRECTORY,    // 目录
     FILE_TYPE_SYMLINK,// 符号链接

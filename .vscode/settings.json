@@ -40,6 +40,8 @@
         "stdlib.h": "c",
         "unistd.h": "c",
         "context_menu.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "time.h": "c",
+        "stddef.h": "c"
     }
 }
