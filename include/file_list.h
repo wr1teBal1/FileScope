@@ -57,6 +57,10 @@ typedef struct FileListView {
     size_t edit_cursor_pos;      // 光标位置
     Uint32 last_blink_time;      // 上次光标闪烁时间
     bool cursor_visible;         // 光标是否可见
+    
+    // 搜索相关
+    char search_filter[256];     // 搜索过滤条件
+    bool has_search_filter;      // 是否有搜索过滤条件
 } FileListView;
 
 // 创建文件列表视图
@@ -119,5 +123,11 @@ void file_list_view_stop_editing(FileListView *view, bool save_changes);
 bool file_list_view_is_editing(FileListView *view);
 void file_list_view_handle_text_input(FileListView *view, const char *text);
 void file_list_view_handle_key_input(FileListView *view, SDL_Scancode scancode);
+
+// 搜索相关函数
+void file_list_view_set_search_filter(FileListView *view, const char *search_term);
+void file_list_view_clear_search_filter(FileListView *view);
+bool file_list_view_has_search_filter(FileListView *view);
+bool file_item_matches_search(FileItem *item, const char *search_term);
 
 #endif // FILE_LIST_H

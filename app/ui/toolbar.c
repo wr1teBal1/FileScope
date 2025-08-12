@@ -14,6 +14,7 @@
 #include <math.h>
 #include "main_window.h"
 #include <SDL3_ttf/SDL_ttf.h> // 确保加上
+#include <SDL3/SDL.h> // 添加SDL3头文件
 // #include "toolbar.h"
 // #include "renderer.h"
 // #include "file_list.h"
@@ -472,7 +473,8 @@ static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
             break;
             
         case BUTTON_SEARCH:
-            // TODO: 实现搜索功能
+            // 激活搜索功能
+            toolbar_search_start(toolbar);
             break;
             
         case BUTTON_VIEW:
@@ -662,6 +664,22 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
                     x >= toolbar->rect.x && x < toolbar->rect.x + toolbar->rect.w &&
                     y >= toolbar->rect.y && y < toolbar->rect.y + toolbar->rect.h) {
                     
+                    // 检查是否点击了搜索框
+                    int search_box_w = 220;
+                    int search_box_h = BUTTON_SIZE;
+                    int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING;
+                    int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2;
+                    
+                    if (x >= search_box_x && x < search_box_x + search_box_w &&
+                        y >= search_box_y && y < search_box_y + search_box_h) {
+                        // 点击了搜索框，激活搜索
+                        toolbar_search_start(toolbar);
+                        return true;
+                    } else if (toolbar->search_active) {
+                        // 点击了搜索框外的区域，停止搜索
+                        toolbar_search_stop(toolbar);
+                    }
+                    
                     // 查找点击的按钮
                     ToolbarButton *button = find_button_at_point(toolbar, x, y);
                     if (button) {
@@ -694,6 +712,24 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
                         return true;
                     }
                 }
+            }
+            break;
+            
+        case SDL_EVENT_KEY_DOWN:
+            // 如果搜索栏激活，处理键盘输入
+            if (toolbar->search_active) {
+                printf("[DEBUG] 收到按键: %d\n", event->key.scancode);
+                toolbar_search_handle_key(toolbar, event->key.scancode);
+                return true;
+            }
+            break;
+            
+        case SDL_EVENT_TEXT_INPUT:
+            // 如果搜索栏激活，处理文本输入
+            if (toolbar->search_active) {
+                printf("[DEBUG] 收到文本输入: '%s'\n", event->text.text);
+                toolbar_search_handle_text(toolbar, event->text.text);
+                return true;
             }
             break;
             
@@ -744,11 +780,18 @@ void toolbar_draw(Toolbar *toolbar) {
     SDL_FRect search_box = {
         (float)search_box_x, (float)search_box_y, (float)search_box_w, (float)search_box_h
     };
+    
+    // 根据搜索状态选择背景颜色
+    SDL_Color search_bg_color = toolbar->search_active ? 
+        (SDL_Color){255, 255, 240, 255} : (SDL_Color){255, 255, 255, 255};
+    SDL_Color search_border_color = toolbar->search_active ? 
+        (SDL_Color){0, 120, 215, 255} : (SDL_Color){100, 100, 100, 255};
+    
     // 背景
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, search_bg_color.r, search_bg_color.g, search_bg_color.b, search_bg_color.a);
     SDL_RenderFillRect(renderer, &search_box);
     // 边框
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+    SDL_SetRenderDrawColor(renderer, search_border_color.r, search_border_color.g, search_border_color.b, search_border_color.a);
     SDL_RenderRect(renderer, &search_box);
     // 显示输入内容`
     if (toolbar->search_active || toolbar->search_text[0] != '\0') {
@@ -766,6 +809,27 @@ void toolbar_draw(Toolbar *toolbar) {
                 }
                 SDL_DestroySurface(text_surface);
             }
+        }
+        
+        // 如果搜索栏激活，绘制光标
+        if (toolbar->search_active) {
+            int cursor_x = search_box_x + 8;
+            if (toolbar->search_text[0] != '\0' && toolbar->app->font) {
+                // 计算光标位置
+                char temp_text[256];
+                strncpy(temp_text, toolbar->search_text, toolbar->search_cursor_pos);
+                temp_text[toolbar->search_cursor_pos] = '\0';
+                
+                SDL_Surface *cursor_surface = TTF_RenderText_Blended(toolbar->app->font, temp_text, strlen(temp_text), text_color);
+                if (cursor_surface) {
+                    cursor_x += cursor_surface->w;
+                    SDL_DestroySurface(cursor_surface);
+                }
+            }
+            
+            // 绘制光标
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderLine(renderer, cursor_x, search_box_y + 4, cursor_x, search_box_y + search_box_h - 4);
         }
     } else {
         // 显示placeholder
@@ -788,21 +852,48 @@ void toolbar_draw(Toolbar *toolbar) {
 
 void toolbar_search_start(Toolbar *toolbar) {
     if (!toolbar) return;
+    printf("[DEBUG] 搜索栏激活\n");
     toolbar->search_active = true;
     toolbar->search_text[0] = '\0';
     toolbar->search_cursor_pos = 0;
+    
+    // 启用SDL文本输入模式，传入窗口参数
+    if (toolbar->app && toolbar->app->window) {
+        SDL_StartTextInput(toolbar->app->window);
+        printf("[DEBUG] SDL文本输入已启用\n");
+    } else {
+        printf("[WARNING] 无法启用SDL文本输入：窗口指针无效\n");
+    }
 }
 void toolbar_search_stop(Toolbar *toolbar) {
     if (!toolbar) return;
+    printf("[DEBUG] 搜索栏停止\n");
     toolbar->search_active = false;
+    
+    // 停止SDL文本输入模式，传入窗口参数
+    if (toolbar->app && toolbar->app->window) {
+        SDL_StopTextInput(toolbar->app->window);
+        printf("[DEBUG] SDL文本输入已停止\n");
+    } else {
+        printf("[WARNING] 无法停止SDL文本输入：窗口指针无效\n");
+    }
 }
 void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
     if (!toolbar || !toolbar->search_active || !text) return;
+    printf("[DEBUG] 处理文本输入: '%s', 当前文本: '%s', 光标位置: %d\n", 
+           text, toolbar->search_text, toolbar->search_cursor_pos);
+    
     size_t len = strlen(toolbar->search_text);
     size_t tlen = strlen(text);
     if (len + tlen < sizeof(toolbar->search_text) - 1) {
-        strcat(toolbar->search_text, text);
+        // 在光标位置插入文本
+        memmove(&toolbar->search_text[toolbar->search_cursor_pos + tlen], 
+               &toolbar->search_text[toolbar->search_cursor_pos], 
+               len - toolbar->search_cursor_pos + 1);
+        memcpy(&toolbar->search_text[toolbar->search_cursor_pos], text, tlen);
         toolbar->search_cursor_pos += tlen;
+        printf("[DEBUG] 文本更新后: '%s', 光标位置: %d\n", 
+               toolbar->search_text, toolbar->search_cursor_pos);
     }
 }
 void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
@@ -811,19 +902,60 @@ void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
     switch (scancode) {
         case SDL_SCANCODE_BACKSPACE:
             if (toolbar->search_cursor_pos > 0 && len > 0) {
-                toolbar->search_text[toolbar->search_cursor_pos-1] = '\0';
+                // 从光标位置向前删除一个字符
+                memmove(&toolbar->search_text[toolbar->search_cursor_pos-1], 
+                       &toolbar->search_text[toolbar->search_cursor_pos], 
+                       len - toolbar->search_cursor_pos + 1);
                 toolbar->search_cursor_pos--;
             }
             break;
         case SDL_SCANCODE_RETURN:
-            // TODO: 触发搜索
+            // 执行搜索
+            if (toolbar->search_text[0] != '\0') {
+                printf("[DEBUG] 执行搜索: %s\n", toolbar->search_text);
+                // 调用实际的搜索功能
+                toolbar_search(toolbar, toolbar->search_text);
+            }
             toolbar_search_stop(toolbar);
             break;
         case SDL_SCANCODE_ESCAPE:
             toolbar_search_stop(toolbar);
             break;
+        case SDL_SCANCODE_LEFT:
+            if (toolbar->search_cursor_pos > 0) {
+                toolbar->search_cursor_pos--;
+            }
+            break;
+        case SDL_SCANCODE_RIGHT:
+            if (toolbar->search_cursor_pos < len) {
+                toolbar->search_cursor_pos++;
+            }
+            break;
         default:
             break;
     }
+}
+
+// 实现工具栏搜索功能
+bool toolbar_search(Toolbar *toolbar, const char *search_term) {
+    if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
+        return false;
+    }
+    
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
+    if (!main_window || !main_window->file_list_view) {
+        return false;
+    }
+    
+    printf("[DEBUG] 工具栏执行搜索: '%s'\n", search_term);
+    
+    // 调用文件列表视图的搜索功能
+    if (search_term && strlen(search_term) > 0) {
+        file_list_view_set_search_filter(main_window->file_list_view, search_term);
+    } else {
+        file_list_view_clear_search_filter(main_window->file_list_view);
+    }
+    
+    return true;
 }
 

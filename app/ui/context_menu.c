@@ -344,7 +344,7 @@ void context_menu_draw(ContextMenu *menu) {
         if (item->type == MENU_ITEM_ACTION && item->text) {
             // 绘制菜单项文本
             SDL_Color text_color = item->enabled ? MENU_TEXT_COLOR : MENU_DISABLED_COLOR;
-            SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->text, 0, text_color);
+            SDL_Surface *text_surface = TTF_RenderText_Blended(font, item->text, strlen(item->text), text_color);
             
             if (text_surface) {
                 SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);

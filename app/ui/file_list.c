@@ -135,6 +135,10 @@ FileListView* file_list_view_new(struct Window *window) {
     view->last_blink_time = 0;
     view->cursor_visible = true;
     
+    // 初始化搜索相关字段
+    view->search_filter[0] = '\0';
+    view->has_search_filter = false;
+    
     // 设置视口区域（默认为整个窗口）
     view->viewport.x = 0;
     view->viewport.y = 0;
@@ -422,6 +426,12 @@ void file_list_view_draw(FileListView *view) {
                 continue;
             }
             
+            // 应用搜索过滤
+            if (view->has_search_filter && !file_item_matches_search(item, view->search_filter)) {
+                item = item->next;
+                continue;
+            }
+            
             // 换行处理
             if (x > max_x) {
                 x = (int)view->viewport.x + 10;
@@ -668,6 +678,12 @@ void file_list_view_draw(FileListView *view) {
         while (item) {
             // 跳过隐藏文件
             if (item->is_hidden && !view->show_hidden) {
+                item = item->next;
+                continue;
+            }
+            
+            // 应用搜索过滤
+            if (view->has_search_filter && !file_item_matches_search(item, view->search_filter)) {
                 item = item->next;
                 continue;
             }
@@ -1433,6 +1449,12 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                             continue;
                         }
                         
+                        // 应用搜索过滤
+                        if (view->has_search_filter && !file_item_matches_search(item, view->search_filter)) {
+                            item = item->next;
+                            continue;
+                        }
+                        
                         // 换行处理（与绘制逻辑一致）
                         if (draw_x > max_x) {
                             draw_x = (int)view->viewport.x + 10;
@@ -1569,4 +1591,85 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
     }
     
     return false;
+}
+
+// 搜索相关函数实现
+
+// 设置搜索过滤条件
+void file_list_view_set_search_filter(FileListView *view, const char *search_term) {
+    if (!view || !search_term) {
+        return;
+    }
+    
+    printf("[DEBUG] 设置搜索过滤条件: '%s'\n", search_term);
+    
+    // 复制搜索条件
+    strncpy(view->search_filter, search_term, sizeof(view->search_filter) - 1);
+    view->search_filter[sizeof(view->search_filter) - 1] = '\0';
+    
+    // 设置搜索标志
+    view->has_search_filter = true;
+    
+    // 重新加载当前目录以应用过滤
+    if (view->current_path) {
+        printf("[DEBUG] 重新加载目录以应用搜索过滤: %s\n", view->current_path);
+        file_list_view_load_directory(view, view->current_path);
+    }
+}
+
+// 清除搜索过滤条件
+void file_list_view_clear_search_filter(FileListView *view) {
+    if (!view) {
+        return;
+    }
+    
+    printf("[DEBUG] 清除搜索过滤条件\n");
+    
+    // 清除搜索条件
+    view->search_filter[0] = '\0';
+    view->has_search_filter = false;
+    
+    // 重新加载当前目录以显示所有文件
+    if (view->current_path) {
+        printf("[DEBUG] 重新加载目录以显示所有文件: %s\n", view->current_path);
+        file_list_view_load_directory(view, view->current_path);
+    }
+}
+
+// 检查是否有搜索过滤条件
+bool file_list_view_has_search_filter(FileListView *view) {
+    return view && view->has_search_filter;
+}
+
+// 检查文件项是否匹配搜索条件
+bool file_item_matches_search(FileItem *item, const char *search_term) {
+    if (!item || !search_term || strlen(search_term) == 0) {
+        return true; // 如果没有搜索条件，显示所有文件
+    }
+    
+    // 转换为小写进行比较（简单实现）
+    char item_name_lower[256];
+    char search_lower[256];
+    
+    strncpy(item_name_lower, item->display_name ? item->display_name : item->name, sizeof(item_name_lower) - 1);
+    item_name_lower[sizeof(item_name_lower) - 1] = '\0';
+    
+    strncpy(search_lower, search_term, sizeof(search_lower) - 1);
+    search_lower[sizeof(search_lower) - 1] = '\0';
+    
+    // 转换为小写
+    for (int i = 0; item_name_lower[i]; i++) {
+        if (item_name_lower[i] >= 'A' && item_name_lower[i] <= 'Z') {
+            item_name_lower[i] = item_name_lower[i] - 'A' + 'a';
+        }
+    }
+    
+    for (int i = 0; search_lower[i]; i++) {
+        if (search_lower[i] >= 'A' && search_lower[i] <= 'Z') {
+            search_lower[i] = search_lower[i] - 'A' + 'a';
+        }
+    }
+    
+    // 检查是否包含搜索词
+    return strstr(item_name_lower, search_lower) != NULL;
 }

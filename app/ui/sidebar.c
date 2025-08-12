@@ -471,7 +471,7 @@ static void sidebar_draw_item(Sidebar *sidebar, int index) {
             SDL_Surface *text_surface = TTF_RenderText_Blended(
                 sidebar->app->font,
                 item->name,
-                0, // 使用0表示自动计算字符串长度
+                strlen(item->name),
                 sidebar->text_color
             );
             
