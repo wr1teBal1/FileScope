@@ -1597,24 +1597,67 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
 
 // 设置搜索过滤条件
 void file_list_view_set_search_filter(FileListView *view, const char *search_term) {
-    if (!view || !search_term) {
+    if (!view) {
         return;
     }
     
-    printf("[DEBUG] 设置搜索过滤条件: '%s'\n", search_term);
+    printf("[DEBUG] 设置搜索过滤条件: '%s'\n", search_term ? search_term : "NULL");
+    
+    // 保存当前的滚动位置和选择状态
+    int saved_scroll_offset = view->scroll_offset_y;
+    int saved_selected_index = view->selected_index;
     
     // 复制搜索条件
-    strncpy(view->search_filter, search_term, sizeof(view->search_filter) - 1);
-    view->search_filter[sizeof(view->search_filter) - 1] = '\0';
-    
-    // 设置搜索标志
-    view->has_search_filter = true;
-    
-    // 重新加载当前目录以应用过滤
-    if (view->current_path) {
-        printf("[DEBUG] 重新加载目录以应用搜索过滤: %s\n", view->current_path);
-        file_list_view_load_directory(view, view->current_path);
+    if (search_term) {
+        strncpy(view->search_filter, search_term, sizeof(view->search_filter) - 1);
+        view->search_filter[sizeof(view->search_filter) - 1] = '\0';
+        view->has_search_filter = true;
+    } else {
+        view->search_filter[0] = '\0';
+        view->has_search_filter = false;
     }
+    
+    // 不重新加载目录，只应用过滤
+    // 重置选择状态，但保持滚动位置
+    view->selected_index = -1;
+    
+    // 如果之前有选中的项目，尝试在新的过滤结果中找到它
+    if (saved_selected_index >= 0 && view->files && view->files->head) {
+        FileItem *saved_item = NULL;
+        int index = 0;
+        FileItem *item = view->files->head;
+        
+        // 找到之前选中的项目
+        while (item && index < saved_selected_index) {
+            if (!item->is_hidden || view->show_hidden) {
+                if (!view->has_search_filter || file_item_matches_search(item, view->search_filter)) {
+                    index++;
+                }
+            }
+            item = item->next;
+        }
+        
+        if (item) {
+            // 在过滤后的列表中查找该项目
+            index = 0;
+            item = view->files->head;
+            while (item) {
+                if (!item->is_hidden || view->show_hidden) {
+                    if (!view->has_search_filter || file_item_matches_search(item, view->search_filter)) {
+                        // 检查是否是之前选中的项目
+                        if (index == saved_selected_index) {
+                            view->selected_index = index;
+                            break;
+                        }
+                        index++;
+                    }
+                }
+                item = item->next;
+            }
+        }
+    }
+    
+    printf("[DEBUG] 搜索过滤已应用，保持滚动位置: %d\n", saved_scroll_offset);
 }
 
 // 清除搜索过滤条件
@@ -1625,15 +1668,51 @@ void file_list_view_clear_search_filter(FileListView *view) {
     
     printf("[DEBUG] 清除搜索过滤条件\n");
     
+    // 保存当前的滚动位置和选择状态
+    int saved_scroll_offset = view->scroll_offset_y;
+    int saved_selected_index = view->selected_index;
+    
     // 清除搜索条件
     view->search_filter[0] = '\0';
     view->has_search_filter = false;
     
-    // 重新加载当前目录以显示所有文件
-    if (view->current_path) {
-        printf("[DEBUG] 重新加载目录以显示所有文件: %s\n", view->current_path);
-        file_list_view_load_directory(view, view->current_path);
+    // 不重新加载目录，只清除过滤
+    // 重置选择状态，但保持滚动位置
+    view->selected_index = -1;
+    
+    // 如果之前有选中的项目，尝试在新的过滤结果中找到它
+    if (saved_selected_index >= 0 && view->files && view->files->head) {
+        FileItem *saved_item = NULL;
+        int index = 0;
+        FileItem *item = view->files->head;
+        
+        // 找到之前选中的项目
+        while (item && index < saved_selected_index) {
+            if (!item->is_hidden || view->show_hidden) {
+                index++;
+            }
+            item = item->next;
+        }
+        
+        if (item) {
+            // 在清除过滤后的列表中查找该项目
+            index = 0;
+            item = view->files->head;
+            while (item) {
+                if (!item->is_hidden || view->show_hidden) {
+                    // 检查是否是之前选中的项目
+                    if (index == saved_selected_index) {
+                        view->selected_index = index;
+                        break;
+                    }
+                    index++;
+                }
+                item = item->next;
+            }
+        }
     }
+    
+    printf("[DEBUG] 搜索过滤已清除，保持滚动位置: %d\n", saved_scroll_offset);
 }
 
 // 检查是否有搜索过滤条件

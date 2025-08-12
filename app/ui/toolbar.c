@@ -672,8 +672,32 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
                     
                     if (x >= search_box_x && x < search_box_x + search_box_w &&
                         y >= search_box_y && y < search_box_y + search_box_h) {
-                        // 点击了搜索框，激活搜索
-                        toolbar_search_start(toolbar);
+                        
+                        // 检查是否点击了清除搜索按钮
+                        if (toolbar->search_text[0] != '\0') {
+                            int clear_button_size = 16;
+                            int clear_button_x = search_box_x + search_box_w - clear_button_size - 4;
+                            int clear_button_y = search_box_y + (search_box_h - clear_button_size) / 2;
+                            
+                            if (x >= clear_button_x && x < clear_button_x + clear_button_size &&
+                                y >= clear_button_y && y < clear_button_y + clear_button_size) {
+                                // 点击了清除搜索按钮
+                                toolbar->search_text[0] = '\0';
+                                toolbar->search_cursor_pos = 0;
+                                toolbar_search(toolbar, "");
+                                printf("[DEBUG] 点击清除搜索按钮\n");
+                                return true;
+                            }
+                        }
+                        
+                        // 点击了搜索框
+                        if (toolbar->search_active) {
+                            // 如果搜索栏已经激活，不做任何操作
+                        } else {
+                            // 如果搜索栏未激活，重新激活搜索
+                            toolbar_search_start(toolbar);
+                            // 保持现有的搜索文本
+                        }
                         return true;
                     } else if (toolbar->search_active) {
                         // 点击了搜索框外的区域，停止搜索
@@ -831,6 +855,27 @@ void toolbar_draw(Toolbar *toolbar) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderLine(renderer, cursor_x, search_box_y + 4, cursor_x, search_box_y + search_box_h - 4);
         }
+        
+        // 绘制清除搜索按钮（X）
+        if (toolbar->search_text[0] != '\0') {
+            int clear_button_size = 16;
+            int clear_button_x = search_box_x + search_box_w - clear_button_size - 4;
+            int clear_button_y = search_box_y + (search_box_h - clear_button_size) / 2;
+            
+            // 绘制清除按钮背景（圆形）
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            SDL_FRect clear_button = {(float)clear_button_x, (float)clear_button_y, (float)clear_button_size, (float)clear_button_size};
+            SDL_RenderFillRect(renderer, &clear_button);
+            
+            // 绘制X符号
+            SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+            SDL_RenderLine(renderer, 
+                          clear_button_x + 4, clear_button_y + 4, 
+                          clear_button_x + clear_button_size - 4, clear_button_y + clear_button_size - 4);
+            SDL_RenderLine(renderer, 
+                          clear_button_x + clear_button_size - 4, clear_button_y + 4, 
+                          clear_button_x + 4, clear_button_y + clear_button_size - 4);
+        }
     } else {
         // 显示placeholder
         SDL_Color ph_color = {180, 180, 180, 255};
@@ -854,8 +899,15 @@ void toolbar_search_start(Toolbar *toolbar) {
     if (!toolbar) return;
     printf("[DEBUG] 搜索栏激活\n");
     toolbar->search_active = true;
-    toolbar->search_text[0] = '\0';
-    toolbar->search_cursor_pos = 0;
+    
+    // 不清除现有搜索文本，保持用户之前的搜索内容
+    // 如果搜索文本为空，设置光标位置为0
+    if (toolbar->search_text[0] == '\0') {
+        toolbar->search_cursor_pos = 0;
+    } else {
+        // 如果已有搜索文本，将光标移到文本末尾
+        toolbar->search_cursor_pos = strlen(toolbar->search_text);
+    }
     
     // 启用SDL文本输入模式，传入窗口参数
     if (toolbar->app && toolbar->app->window) {
@@ -877,6 +929,9 @@ void toolbar_search_stop(Toolbar *toolbar) {
     } else {
         printf("[WARNING] 无法停止SDL文本输入：窗口指针无效\n");
     }
+    
+    // 不清除搜索文本，保持搜索结果可见
+    // 用户可以通过点击搜索框重新激活搜索，或者通过其他方式清除搜索
 }
 void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
     if (!toolbar || !toolbar->search_active || !text) return;
@@ -894,6 +949,9 @@ void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
         toolbar->search_cursor_pos += tlen;
         printf("[DEBUG] 文本更新后: '%s', 光标位置: %d\n", 
                toolbar->search_text, toolbar->search_cursor_pos);
+        
+        // 实时更新搜索过滤
+        toolbar_search(toolbar, toolbar->search_text);
     }
 }
 void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
@@ -907,6 +965,9 @@ void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
                        &toolbar->search_text[toolbar->search_cursor_pos], 
                        len - toolbar->search_cursor_pos + 1);
                 toolbar->search_cursor_pos--;
+                
+                // 实时更新搜索过滤
+                toolbar_search(toolbar, toolbar->search_text);
             }
             break;
         case SDL_SCANCODE_RETURN:
@@ -929,6 +990,15 @@ void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
         case SDL_SCANCODE_RIGHT:
             if (toolbar->search_cursor_pos < len) {
                 toolbar->search_cursor_pos++;
+            }
+            break;
+        case SDL_SCANCODE_L:
+            // Ctrl+L 清除搜索
+            if (SDL_GetModState() & SDL_KMOD_CTRL) {
+                toolbar->search_text[0] = '\0';
+                toolbar->search_cursor_pos = 0;
+                toolbar_search(toolbar, "");
+                printf("[DEBUG] 清除搜索\n");
             }
             break;
         default:
