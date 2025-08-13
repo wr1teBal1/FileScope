@@ -42,6 +42,22 @@
         "context_menu.h": "c",
         "stdio.h": "c",
         "time.h": "c",
-        "stddef.h": "c"
+        "stddef.h": "c",
+        "config.h": "c",
+        "file_watcher.h": "c",
+        "path_resolver.h": "c",
+        "charconv": "c",
+        "string": "c",
+        "optional": "c",
+        "memory": "c",
+        "text_encoding": "c",
+        "functional": "c",
+        "file_monitor.h": "c",
+        "array": "c",
+        "tuple": "c",
+        "utility": "c",
+        "variant": "c",
+        "random": "c",
+        "tchar.h": "c"
     }
 }

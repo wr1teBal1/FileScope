@@ -5,6 +5,7 @@
 #include "window.h"
 #include "file_item.h"
 #include "file_system.h"
+#include "sort.h"
 
 // 文件列表视图模式
 typedef enum {
@@ -38,6 +39,7 @@ typedef struct FileListView {
     char *current_path;          // 当前目录路径
     ViewMode view_mode;          // 视图模式
     SortMode sort_mode;          // 排序方式
+    SortConfig *sort_config;     // 排序配置
     bool show_hidden;            // 是否显示隐藏文件
     int scroll_offset_y;         // 垂直滚动偏移
     int item_width;              // 项目宽度
@@ -86,6 +88,12 @@ void file_list_view_toggle_mode(FileListView *view);
 
 // 设置排序方式
 void file_list_view_set_sort(FileListView *view, SortMode sort);
+
+// 设置排序方向
+void file_list_view_set_sort_direction(FileListView *view, SortDirection direction);
+
+// 设置文件夹优先
+void file_list_view_set_folder_first(FileListView *view, bool folder_first);
 
 // 设置是否显示隐藏文件
 void file_list_view_set_show_hidden(FileListView *view, bool show_hidden);

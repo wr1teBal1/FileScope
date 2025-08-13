@@ -10,6 +10,7 @@
 
 #include "file_system.h"
 #include "sidebar.h"
+#include "path_resolver.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -151,15 +152,35 @@ bool fs_path_exists(const char *path) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return false;
     }
-    //
+    
+    // 临时回退方案：如果路径解析器有问题，直接使用原始路径
     struct stat st;
     if (stat(path, &st) == 0) {
         fs_set_error(FS_ERROR_NONE);
         return true;
     }
-
-    fs_set_error_from_errno();
-    return false;
+    
+    // 如果直接检查失败，尝试使用路径解析器
+    PathInfo *info = path_resolve(path, NULL);
+    if (!info || !info->is_valid) {
+        if (info) {
+            path_info_free(info);
+        }
+        fs_set_error_from_errno();
+        return false;
+    }
+    
+    // 使用解析后的绝对路径检查文件是否存在
+    bool exists = false;
+    if (stat(info->absolute_path, &st) == 0) {
+        fs_set_error(FS_ERROR_NONE);
+        exists = true;
+    } else {
+        fs_set_error_from_errno();
+    }
+    
+    path_info_free(info);
+    return exists;
 }
 
 // 检查是否为目录
@@ -483,6 +504,7 @@ const char* fs_get_filename(const char *path) {
         return NULL;
     }
 
+    // 临时回退方案：如果路径解析器有问题，使用传统方法
     // 查找最后一个路径分隔符（支持Unix和Windows）
     const char *slash = strrchr(path, '/');
     const char *backslash = strrchr(path, '\\');
@@ -536,7 +558,8 @@ const char* fs_get_directory(const char *path) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return NULL;
     }
-
+    
+    // 临时回退方案：如果路径解析器有问题，使用传统方法
     strncpy(dirname, path, sizeof(dirname) - 1);
     dirname[sizeof(dirname) - 1] = '\0';
 
@@ -574,7 +597,8 @@ char* fs_combine_path(const char *path1, const char *path2) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return NULL;
     }
-
+    
+    // 临时回退方案：如果路径解析器有问题，使用传统方法
     size_t len1 = strlen(path1);
     size_t len2 = strlen(path2);
     size_t len = len1 + len2 + 2; // +2 for separator and '\0'
@@ -619,19 +643,27 @@ char* fs_combine_path(const char *path1, const char *path2) {
 
 // 获取绝对路径
 char* fs_get_absolute_path(const char *path) {
-    // if (!path) {
-    //     fs_set_error(FS_ERROR_INVALID_NAME);
-    //     return NULL;
-    // }
-
-    // char *abs_path = realpath(path, NULL);
-    // if (!abs_path) {
-    //     fs_set_error_from_errno();
+    if (!path) {
+        fs_set_error(FS_ERROR_INVALID_NAME);
         return NULL;
-    // }
-
-    // fs_set_error(FS_ERROR_NONE);
-    // return abs_path;
+    }
+    
+    // 临时回退方案：如果路径解析器有问题，使用传统方法
+    char *abs_path = realpath(path, NULL);
+    if (abs_path) {
+        fs_set_error(FS_ERROR_NONE);
+        return abs_path;
+    }
+    
+    // 如果传统方法失败，尝试使用路径解析器
+    abs_path = path_to_absolute(path, fs_get_current_directory());
+    if (abs_path) {
+        fs_set_error(FS_ERROR_NONE);
+    } else {
+        fs_set_error(FS_ERROR_INVALID_NAME);
+    }
+    
+    return abs_path;
 }
 
 // 获取相对路径

@@ -20,6 +20,7 @@
 #include "file_item.h"
 #include "renderer.h"
 #include "file_ops.h"
+#include "sort.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -111,6 +112,18 @@ FileListView* file_list_view_new(struct Window *window) {
     view->view_mode = VIEW_MODE_ICONS;
     view->sort_mode = SORT_BY_NAME;
     view->show_hidden = false;
+    
+    // 初始化排序配置
+    view->sort_config = sort_config_new();
+    if (!view->sort_config) {
+        file_list_free(view->files);
+        free(view);
+        return NULL;
+    }
+    
+    // 设置默认排序规则：按名称升序，文件夹优先
+    sort_config_set_folder_first(view->sort_config, true);
+    sort_config_add_rule(view->sort_config, SORT_FIELD_NAME, SORT_ASCENDING, 1);
     view->scroll_offset_y = 0;
     view->item_width = DEFAULT_ITEM_WIDTH;
     view->item_height = DEFAULT_ITEM_HEIGHT;
@@ -162,6 +175,11 @@ void file_list_view_free(FileListView *view) {
     // 释放文件列表
     if (view->files) {
         file_list_free(view->files);
+    }
+
+    // 释放排序配置
+    if (view->sort_config) {
+        sort_config_free(view->sort_config);
     }
 
     // 释放当前路径
@@ -293,6 +311,29 @@ void file_list_view_set_sort(FileListView *view, SortMode sort) {
     file_list_view_refresh(view);
 }
 
+// 设置排序方向
+void file_list_view_set_sort_direction(FileListView *view, SortDirection direction) {
+    if (!view || !view->sort_config) {
+        return;
+    }
+    
+    // 更新排序规则的方向
+    if (view->sort_config->rule_count > 0) {
+        view->sort_config->rules[0].direction = direction;
+        file_list_view_refresh(view);
+    }
+}
+
+// 设置文件夹优先
+void file_list_view_set_folder_first(FileListView *view, bool folder_first) {
+    if (!view || !view->sort_config) {
+        return;
+    }
+    
+    sort_config_set_folder_first(view->sort_config, folder_first);
+    file_list_view_refresh(view);
+}
+
 // 设置是否显示隐藏文件
 void file_list_view_set_show_hidden(FileListView *view, bool show_hidden) {
     if (!view) {
@@ -320,7 +361,33 @@ void file_list_view_refresh(FileListView *view) {
     file_list_load_directory(view->files, view->files->current_dir);
 
     // 应用排序
-    // TODO: 实现排序功能
+    if (view->sort_config && view->files->count > 1) {
+        // 根据排序模式设置排序规则
+        sort_config_clear_rules(view->sort_config);
+        
+        switch (view->sort_mode) {
+            case SORT_BY_NAME:
+                sort_config_add_rule(view->sort_config, SORT_FIELD_NAME, SORT_ASCENDING, 1);
+                break;
+            case SORT_BY_SIZE:
+                sort_config_add_rule(view->sort_config, SORT_FIELD_SIZE, SORT_DESCENDING, 1);
+                break;
+            case SORT_BY_TYPE:
+                sort_config_add_rule(view->sort_config, SORT_FIELD_TYPE, SORT_ASCENDING, 1);
+                sort_config_add_rule(view->sort_config, SORT_FIELD_NAME, SORT_ASCENDING, 2);
+                break;
+            case SORT_BY_DATE_MODIFIED:
+                sort_config_add_rule(view->sort_config, SORT_FIELD_DATE_MODIFIED, SORT_DESCENDING, 1);
+                break;
+            default:
+                sort_config_add_rule(view->sort_config, SORT_FIELD_NAME, SORT_ASCENDING, 1);
+                break;
+        }
+        
+        // 智能选择排序算法
+        SortAlgorithm algorithm = sort_select_algorithm(view->files->count);
+        sort_file_list(view->files, view->sort_config, algorithm);
+    }
 
     // 恢复选中状态（如果可能）
     if (selected_path) {

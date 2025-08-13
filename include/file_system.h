@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include "file_item.h"
+#include "path_resolver.h"
 #include <stdbool.h>
 #include <dirent.h>
 

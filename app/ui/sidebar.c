@@ -10,6 +10,7 @@
 #include "sidebar.h"
 #include "renderer.h"
 #include "file_system.h"
+#include "path_resolver.h"
 #include "toolbar.h"
 #include <stdlib.h>
 #include <string.h>
@@ -530,8 +531,47 @@ static bool get_special_folder_path_wrapper(SpecialFolder folder, char *path, si
         return false;
     }
     
-    // 调用file_system.c中实现的函数
-    return get_special_folder_path(folder, path, path_size);
+    // 使用路径解析器处理虚拟路径
+    const char *virtual_path = NULL;
+    switch (folder) {
+        case FOLDER_DESKTOP:
+            virtual_path = "桌面";
+            break;
+        case FOLDER_DOCUMENTS:
+            virtual_path = "我的文档";
+            break;
+        case FOLDER_DOWNLOADS:
+            virtual_path = "下载";
+            break;
+        case FOLDER_PICTURES:
+            virtual_path = "图片";
+            break;
+        case FOLDER_MUSIC:
+            virtual_path = "音乐";
+            break;
+        case FOLDER_VIDEOS:
+            virtual_path = "视频";
+            break;
+        default:
+            return false;
+    }
+    
+    // 解析虚拟路径
+    PathInfo *info = path_resolve(virtual_path, NULL);
+    if (!info || !info->is_valid) {
+        if (info) {
+            path_info_free(info);
+        }
+        // 如果路径解析失败，回退到原来的方法
+        return get_special_folder_path(folder, path, path_size);
+    }
+    
+    // 复制解析后的路径
+    strncpy(path, info->absolute_path, path_size - 1);
+    path[path_size - 1] = '\0';
+    
+    path_info_free(info);
+    return true;
 }
 
 // 刷新驱动器列表

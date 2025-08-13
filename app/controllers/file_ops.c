@@ -9,6 +9,7 @@
 
 #include "file_system.h"
 #include "file_item.h"
+#include "path_resolver.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,10 +43,30 @@ static void clipboard_clear(void) {
 
 // 复制文件到剪贴板
 bool file_ops_copy(const char *file_path) {
-    if (!file_path || !fs_path_exists(file_path)) {
-        printf("[ERROR] Invalid file path for copy: %s\n", file_path ? file_path : "NULL");
+    if (!file_path) {
+        printf("[ERROR] Invalid file path for copy: NULL\n");
         return false;
     }
+    
+    // 使用路径解析器验证和处理路径
+    PathInfo *info = path_resolve(file_path, NULL);
+    if (!info || !info->is_valid) {
+        if (info) {
+            printf("[ERROR] Invalid file path for copy: %s (%s)\n", file_path, path_get_error_string(info->error));
+            path_info_free(info);
+        }
+        return false;
+    }
+    
+    // 检查文件是否存在
+    if (!fs_path_exists(info->absolute_path)) {
+        printf("[ERROR] File does not exist: %s\n", info->absolute_path);
+        path_info_free(info);
+        return false;
+    }
+    
+    // 使用解析后的绝对路径
+    file_path = info->absolute_path;
 
     clipboard_clear();
     
@@ -64,10 +85,30 @@ bool file_ops_copy(const char *file_path) {
 
 // 剪切文件到剪贴板
 bool file_ops_cut(const char *file_path) {
-    if (!file_path || !fs_path_exists(file_path)) {
-        printf("[ERROR] Invalid file path for cut: %s\n", file_path ? file_path : "NULL");
+    if (!file_path) {
+        printf("[ERROR] Invalid file path for cut: NULL\n");
         return false;
     }
+    
+    // 使用路径解析器验证和处理路径
+    PathInfo *info = path_resolve(file_path, NULL);
+    if (!info || !info->is_valid) {
+        if (info) {
+            printf("[ERROR] Invalid file path for cut: %s (%s)\n", file_path, path_get_error_string(info->error));
+            path_info_free(info);
+        }
+        return false;
+    }
+    
+    // 检查文件是否存在
+    if (!fs_path_exists(info->absolute_path)) {
+        printf("[ERROR] File does not exist: %s\n", info->absolute_path);
+        path_info_free(info);
+        return false;
+    }
+    
+    // 使用解析后的绝对路径
+    file_path = info->absolute_path;
 
     clipboard_clear();
     
@@ -91,10 +132,30 @@ bool file_ops_paste(const char *target_dir) {
         return false;
     }
     
-    if (!target_dir || !fs_path_exists(target_dir)) {
-        printf("[ERROR] Invalid target directory: %s\n", target_dir ? target_dir : "NULL");
+    if (!target_dir) {
+        printf("[ERROR] Invalid target directory: NULL\n");
         return false;
     }
+    
+    // 使用路径解析器验证和处理目标目录路径
+    PathInfo *info = path_resolve(target_dir, NULL);
+    if (!info || !info->is_valid) {
+        if (info) {
+            printf("[ERROR] Invalid target directory: %s (%s)\n", target_dir, path_get_error_string(info->error));
+            path_info_free(info);
+        }
+        return false;
+    }
+    
+    // 检查目标目录是否存在
+    if (!fs_path_exists(info->absolute_path)) {
+        printf("[ERROR] Target directory does not exist: %s\n", info->absolute_path);
+        path_info_free(info);
+        return false;
+    }
+    
+    // 使用解析后的绝对路径
+    target_dir = info->absolute_path;
     
     // 获取源文件名
     const char *filename = fs_get_filename(g_clipboard.file_path);

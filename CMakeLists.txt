@@ -15,6 +15,7 @@ add_executable(FileScope
     engine/cache/thumbnail.c
     engine/filesystem/file_system.c
     engine/filesystem/file_watcher.c
+    engine/filesystem/file_monitor.c
     engine/filesystem/path_resolver.c
     engine/render/icon_cache.c
     engine/render/ui_renderer.c

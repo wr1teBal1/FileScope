@@ -5,6 +5,7 @@
 #include "renderer.h"
 #include "event.h"
 #include "file_system.h"
+#include "path_resolver.h"
 #include "app.h" // 添加app.h头文件
 
 #include <SDL3/SDL_main.h>
@@ -16,6 +17,14 @@ int main(int argc, char* argv[]) {
     struct Window *window = NULL;
     MainWindow *main_window = NULL;
     char *start_dir = NULL;
+    
+    // 初始化路径解析器
+    printf("[DEBUG] Initializing path resolver...\n");
+    if (!path_resolver_init(NULL)) {
+        printf("[ERROR] Failed to initialize path resolver\n");
+        return EXIT_FAILURE;
+    }
+    printf("[DEBUG] Path resolver initialized successfully\n");
 
     printf("[DEBUG] Initializing window...\n");
     // 初始化窗口
@@ -57,6 +66,10 @@ int main(int argc, char* argv[]) {
     } else {
         printf("[ERROR] Failed to initialize window\n");
     }
+    
+    // 清理路径解析器
+    printf("[DEBUG] Cleaning up path resolver\n");
+    path_resolver_cleanup();
 
     return exit_status;
 }

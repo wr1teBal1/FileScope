@@ -52,6 +52,12 @@ typedef struct Toolbar {
     char search_text[256];     // 搜索输入内容
     bool search_active;        // 是否处于搜索输入状态
     int search_cursor_pos;     // 光标位置
+    
+    // 地址栏相关
+    char address_bar_text[1024];  // 地址栏输入内容
+    bool address_bar_active;      // 是否处于地址栏输入状态
+    int address_bar_cursor_pos;   // 地址栏光标位置
+    bool address_bar_editing;     // 是否正在编辑地址栏
 } Toolbar;
 
 // 工具栏基本函数声明
@@ -83,5 +89,12 @@ void toolbar_search_start(Toolbar *toolbar);
 void toolbar_search_stop(Toolbar *toolbar);
 void toolbar_search_handle_text(Toolbar *toolbar, const char *text);
 void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode);
+
+// 地址栏相关API
+void toolbar_address_bar_start(Toolbar *toolbar);
+void toolbar_address_bar_stop(Toolbar *toolbar);
+void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text);
+void toolbar_address_bar_handle_key(Toolbar *toolbar, SDL_Scancode scancode);
+void toolbar_address_bar_navigate(Toolbar *toolbar, const char *path);
 
 #endif // TOOLBAR_H
