@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <limits.h>
 // #include <pwd.h>
 
 #ifdef _WIN32
@@ -649,13 +650,19 @@ char* fs_get_absolute_path(const char *path) {
     }
     
     // 临时回退方案：如果路径解析器有问题，使用传统方法
-    char *abs_path = realpath(path, NULL);
-    if (abs_path) {
-        fs_set_error(FS_ERROR_NONE);
-        return abs_path;
+    char *abs_path = NULL;
+    
+    // 检查是否为绝对路径
+    if (path[0] == '/' || (path[0] && path[1] == ':')) {
+        // 已经是绝对路径，直接复制
+        abs_path = strdup(path);
+        if (abs_path) {
+            fs_set_error(FS_ERROR_NONE);
+            return abs_path;
+        }
     }
     
-    // 如果传统方法失败，尝试使用路径解析器
+    // 尝试使用路径解析器
     abs_path = path_to_absolute(path, fs_get_current_directory());
     if (abs_path) {
         fs_set_error(FS_ERROR_NONE);

@@ -58,6 +58,14 @@
         "utility": "c",
         "variant": "c",
         "random": "c",
-        "tchar.h": "c"
+        "tchar.h": "c",
+        "algorithm": "c",
+        "ranges": "c",
+        "cerrno": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "span": "c",
+        "shlobj.h": "c",
+        "errno.h": "c"
     }
 }
