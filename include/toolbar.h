@@ -22,6 +22,7 @@ typedef enum {
     BUTTON_REFRESH,     // 刷新
     BUTTON_SEARCH,      // 搜索
     BUTTON_VIEW,        // 视图切换
+    BUTTON_COPY,        // 复制 (新增)
     BUTTON_COUNT        // 按钮总数
 } ToolbarButtonType;
 
@@ -61,10 +62,10 @@ typedef struct Toolbar {
 } Toolbar;
 
 // 工具栏基本函数声明
-Toolbar* toolbar_new(struct Window *app);
-void toolbar_free(Toolbar *toolbar);
-bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event);
-void toolbar_draw(Toolbar *toolbar);
+Toolbar* toolbar_new(struct Window *app);// 创建工具栏
+void toolbar_free(Toolbar *toolbar);  // 释放工具栏
+bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event); // 处理工具栏事件
+void toolbar_draw(Toolbar *toolbar);                          // 绘制工具栏
 
 // 通知工具栏目录已更改
 void toolbar_notify_directory_changed(Toolbar *toolbar, const char *path);

@@ -13,16 +13,11 @@
 #include <string.h>
 #include <math.h>
 #include "main_window.h"
-#include <SDL3_ttf/SDL_ttf.h> // 确保加上
+#include <SDL3_ttf/SDL_ttf.h> // 添加SDL3_ttf头文件
 #include <SDL3/SDL.h> // 添加SDL3头文件
-// #include "toolbar.h"
-// #include "renderer.h"
-// #include "file_list.h"
-// #include <string.h>
-// #include <math.h>
-// #include "main_window.h"
+
 #ifndef M_PI
-#define M_PI 3.14159265358979323846
+#define M_PI 3.14159265358979323846// 圆周率
 #endif
 
 // 工具栏样式常量
@@ -32,14 +27,14 @@
 #define BUTTON_SPACING 10      // 按钮之间的间距（像素）
 
 // 颜色常量
-static const SDL_Color TOOLBAR_BG_COLOR = {240, 240, 240, 255};
-static const SDL_Color BUTTON_COLOR = {200, 200, 200, 255};
-static const SDL_Color BUTTON_HOVER_COLOR = {180, 180, 180, 255};
-static const SDL_Color BUTTON_ACTIVE_COLOR = {160, 160, 160, 255};
-static const SDL_Color BUTTON_DISABLED_COLOR = {220, 220, 220, 128};
-static const SDL_Color BUTTON_BORDER_COLOR = {100, 100, 100, 255};
-static const SDL_Color BUTTON_ICON_COLOR = {50, 50, 50, 255};
-
+static const SDL_Color TOOLBAR_BG_COLOR = {240, 240, 240, 255};     // 工具栏背景颜色
+static const SDL_Color BUTTON_COLOR = {200, 200, 200, 255};       // 按钮默认颜色
+static const SDL_Color BUTTON_HOVER_COLOR = {180, 180, 180, 255};    // 按钮悬停颜色
+static const SDL_Color BUTTON_ACTIVE_COLOR = {160, 160, 160, 255};    // 按钮激活颜色
+static const SDL_Color BUTTON_DISABLED_COLOR = {220, 220, 220, 128};   // 按钮禁用颜色
+static const SDL_Color BUTTON_BORDER_COLOR = {100, 100, 100, 255};     // 按钮边框颜色
+static const SDL_Color BUTTON_ICON_COLOR = {50, 50, 50, 255};       // 按钮图标颜色
+ 
 
 // 绘制工具栏按钮
 static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
@@ -50,7 +45,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
     SDL_Renderer *renderer = toolbar->app->renderer;
     
     // 选择按钮颜色
-    SDL_Color button_color;
+    SDL_Color button_color;  // 按钮颜色
     if (!button->enabled) {
         button_color = BUTTON_DISABLED_COLOR;
     } else if (button->pressed) {
@@ -73,7 +68,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
     
     // 绘制按钮边框
     SDL_SetRenderDrawColor(renderer, BUTTON_BORDER_COLOR.r, BUTTON_BORDER_COLOR.g, BUTTON_BORDER_COLOR.b, BUTTON_BORDER_COLOR.a);
-    SDL_RenderRect(renderer, &frect);
+    SDL_RenderRect(renderer, &frect);    // 绘制矩形
     
     // 绘制按钮图标
     SDL_SetRenderDrawColor(renderer, BUTTON_ICON_COLOR.r, BUTTON_ICON_COLOR.g, BUTTON_ICON_COLOR.b, BUTTON_ICON_COLOR.a);
@@ -264,13 +259,13 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
 }
 
 // 查找点击的按钮
-static ToolbarButton* find_button_at_point(Toolbar *toolbar, int x, int y) {
+static ToolbarButton*  find_button_at_point(Toolbar *toolbar, int x, int y) {
     if (!toolbar) {
         return NULL;
     }
     
     for (int i = 0; i < toolbar->button_count; i++) {
-        ToolbarButton *button = &toolbar->buttons[i];
+        ToolbarButton *button = &toolbar->buttons[i];// 获取工具栏按钮
         if (x >= button->rect.x && x < button->rect.x + button->rect.w &&
             y >= button->rect.y && y < button->rect.y + button->rect.h) {
             return button;
@@ -325,18 +320,18 @@ static void add_to_history(Toolbar *toolbar, const char *path) {
 static void navigate_back(Toolbar *toolbar) {
     if (!toolbar || toolbar->history_index <= 0 || !toolbar->app || !toolbar->app->user_data) {
         return;
-    }
+    }           // 获取当前路径
     
-    toolbar->history_index--;
-    const char *path = toolbar->history[toolbar->history_index];
+    toolbar->history_index--;                                     // 回退到上一级
+    const char *path = toolbar->history[toolbar->history_index];  // 获取上一级路径
     
     // 更新文件列表视图
-    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-    file_list_view_load_directory(main_window->file_list_view, path);
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;// 从应用程序的用户数据中获取主窗口指针
+    file_list_view_load_directory(main_window->file_list_view, path);// 通知文件列表视图加载指定路径的目录
     
     // 更新按钮状态
-    toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);
-    toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1);
+    toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0); // 如果历史索引大于0，则启用后退按钮
+    toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1); // 如果历史索引小于最大索引，则启用前进按钮
 }
 
 // 执行前进操作
@@ -345,16 +340,15 @@ static void navigate_forward(Toolbar *toolbar) {
         return;
     }
     
-    toolbar->history_index++;
-    const char *path = toolbar->history[toolbar->history_index];
-    
+    toolbar->history_index++;                                     // 前进到下一级
+    const char *path = toolbar->history[toolbar->history_index];  // 获取下一级路径
     // 更新文件列表视图
-    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-    file_list_view_load_directory(main_window->file_list_view, path);
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;  // 从应用程序的用户数据中获取主窗口指针
+    file_list_view_load_directory(main_window->file_list_view, path); // 通知文件列表视图加载指定路径的目录
     
     // 更新按钮状态
-    toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);
-    toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1);
+    toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);  // 如果历史索引大于0，则启用后退按钮
+    toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1); // 如果历史索引小于最大索引，则启用前进按钮
 }
 
 // 执行上一级操作
@@ -409,37 +403,37 @@ static void navigate_up(Toolbar *toolbar) {
 static void navigate_home(Toolbar *toolbar) {
     if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
         return;
-    }
+    }   //检查工具栏指针是否有效 检查应用程序引用是否有效 检查用户数据是否有效
     
-    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-    FileListView *file_list = main_window->file_list_view;
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data; // 从应用程序的用户数据中获取主窗口指针
+    FileListView *file_list = main_window->file_list_view;          // 获取文件列表视图
     
     if (!file_list) {
-        return;
-    }
+        return;              
+    }                                                                //确保文件列表视图存在
     
-   // 获取用户主目录
-    // const char *home_dir = SDL_GetHomePath();
-    // const char* SDL_GetUserFolder(SDL_Folder folder);
+   
     const char *home_dir = SDL_GetUserFolder(SDL_FOLDER_HOME);
     if (home_dir) {
         file_list_view_load_directory(file_list, home_dir);
         add_to_history(toolbar, home_dir);
-    }
+    }                                                                 //    如果成功获取主目录路径，
+                                                                     //     则：加载主目录到文件列表视图
+                                                                     //     并将主目录添加到导航历史记录
 }
 
 // 执行刷新操作
 static void refresh_view(Toolbar *toolbar) {
     if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
         return;
-    }
+    } // 检查工具栏指针是否有效 检查应用程序引用是否有效 检查用户数据是否有效
     
-    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-    FileListView *file_list = main_window->file_list_view;
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data; // 从应用程序的用户数据中获取主窗口指针
+    FileListView *file_list = main_window->file_list_view;   // 获取文件列表视图
     
     if (!file_list || !file_list->current_path) {
         return;
-    }
+    } // 检查文件列表视图是否存在 并检查当前路径是否有效
     
     // 重新加载当前目录
     file_list_view_load_directory(file_list, file_list->current_path);
@@ -496,33 +490,33 @@ static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
 Toolbar* toolbar_new(struct Window *app) {
     if (!app) {
         return NULL;
-    }
+    } /// 检查应用程序引用是否有效
     
     Toolbar *toolbar = (Toolbar*)calloc(1, sizeof(Toolbar));
     if (!toolbar) {
         return NULL;
-    }
+    } // 分配工具栏内存
     
-    toolbar->app = app;
+    toolbar->app = app; // 设置应用程序引用
     
     // 设置工具栏区域
-    toolbar->rect.x = 0;
-    toolbar->rect.y = 0;
-    toolbar->rect.w = SDL_WINDOW_WIDTH;
-    toolbar->rect.h = TOOLBAR_HEIGHT;
+    toolbar->rect.x = 0; 
+    toolbar->rect.y = 0;  // 工具栏左上角坐标
+    toolbar->rect.w = SDL_WINDOW_WIDTH; // 工具栏宽度
+    toolbar->rect.h = TOOLBAR_HEIGHT;   // 工具栏高度
     
     // 初始化按钮
-    int button_x = BUTTON_PADDING;
+    int button_x = BUTTON_PADDING;      // 按钮左上角X坐标
     
     // 后退按钮
-    toolbar->buttons[BUTTON_BACK].type = BUTTON_BACK;
-    toolbar->buttons[BUTTON_BACK].rect.x = button_x;
-    toolbar->buttons[BUTTON_BACK].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
-    toolbar->buttons[BUTTON_BACK].rect.w = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_BACK].rect.h = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_BACK].tooltip = "后退";
-    toolbar->buttons[BUTTON_BACK].enabled = false;
-    button_x += BUTTON_SIZE + BUTTON_SPACING;
+    toolbar->buttons[BUTTON_BACK].type = BUTTON_BACK; // 按钮类型
+    toolbar->buttons[BUTTON_BACK].rect.x = button_x; // 按钮x坐标
+    toolbar->buttons[BUTTON_BACK].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;  // 按钮y坐标
+    toolbar->buttons[BUTTON_BACK].rect.w = BUTTON_SIZE; // 按钮宽度
+    toolbar->buttons[BUTTON_BACK].rect.h = BUTTON_SIZE; // 按钮高度
+    toolbar->buttons[BUTTON_BACK].tooltip = "后退"; // 鼠标悬停时显示的提示文本
+    toolbar->buttons[BUTTON_BACK].enabled = false; // 按钮是否启用
+    button_x += BUTTON_SIZE + BUTTON_SPACING; // 按钮间距 位置更新  下一个按钮从X=45开始
 
     // 前进按钮
     toolbar->buttons[BUTTON_FORWARD].type = BUTTON_FORWARD;
@@ -586,62 +580,64 @@ Toolbar* toolbar_new(struct Window *app) {
     toolbar->button_count = BUTTON_COUNT;
     
     // 初始化历史记录
-    toolbar->history_capacity = 10;
-    toolbar->history = (char**)calloc(toolbar->history_capacity, sizeof(char*));
+    toolbar->history_capacity = 10;  //设置历史记录数组的初始容量
+    toolbar->history = (char**)calloc(toolbar->history_capacity, sizeof(char*)); // 分配内存 所有指针初始化为 NULL
     if (!toolbar->history) {
         free(toolbar);
         return NULL;
-    }
+    } // 如果分配失败，释放toolbar并返回NULL 
     
-    toolbar->history_count = 0;
-    toolbar->history_index = -1;
+    toolbar->history_count = 0; // 历史记录数量
+    toolbar->history_index = -1; // 当前历史记录索引
 
-    toolbar->search_text[0] = '\0';// 搜索文本
+    toolbar->search_text[0] = '\0';// 将搜索文本设置为空字符串
     toolbar->search_active = false;// 搜索是否激活
     toolbar->search_cursor_pos = 0;// 搜索光标位置
     
     return toolbar;
 }
-
 // 释放工具栏
 void toolbar_free(Toolbar *toolbar) {
     if (!toolbar) {
-        return;
-    }
+        return;   //验证工具栏指针是否有效
+    }       //释放工具栏占用的所有内存资源
     
     // 释放历史记录
     if (toolbar->history) {
+        // 只有当历史记录指针数组存在时才继续
         for (int i = 0; i < toolbar->history_count; i++) {
-            if (toolbar->history[i]) {
-                free(toolbar->history[i]);
+            if (toolbar->history[i]) {      //确保每个字符串指针有效
+                free(toolbar->history[i]); // 释放每个历史记录字符串
             }
         }
-        free(toolbar->history);
+        free(toolbar->history); // 释放历史记录指针数组
     }
     
     free(toolbar);
-}
+}   // 历史记录内存释放
 
 // 处理工具栏事件
-bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
+bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具栏相关的所有SDL事件
     if (!toolbar || !event) {
         return false;
-    }
+    } //验证工具栏和事件指针是否有效
     
-    switch (event->type) {
-        case SDL_EVENT_MOUSE_MOTION:
+    switch (event->type) { // 根据事件类型执行不同的操作
+        case SDL_EVENT_MOUSE_MOTION: // 鼠标移动事件
             {
-                int x = event->motion.x;
-                int y = event->motion.y;
+                int x = event->motion.x; // 获取鼠标x坐标
+                int y = event->motion.y; // 获取鼠标y坐标
                 
                 // 检查鼠标是否在工具栏区域内
                 if (x >= toolbar->rect.x && x < toolbar->rect.x + toolbar->rect.w &&
                     y >= toolbar->rect.y && y < toolbar->rect.y + toolbar->rect.h) {
                     
-                    // 更新按钮悬停状态
+                   // 找到鼠标悬停的按钮
                     ToolbarButton *hover_button = find_button_at_point(toolbar, x, y);
+                    // 更新按钮悬停状态
                     for (int i = 0; i < toolbar->button_count; i++) {
-                        toolbar->buttons[i].hovered = (hover_button == &toolbar->buttons[i]);
+                        toolbar->buttons[i].hovered = (hover_button == &toolbar->buttons[i]); 
+                        // 如果鼠标悬停在按钮上，设置按钮的悬停状态为true
                     }
                     
                     return true;
@@ -654,39 +650,40 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
             }
             break;
             
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: //鼠标按下事件  
             {
-                int x = event->button.x;
-                int y = event->button.y;
+                int x = event->button.x; // 获取鼠标x坐标
+                int y = event->button.y; // 获取鼠标y坐标
                 
                 // 检查鼠标点击是否在工具栏区域内
-                if (event->button.button == SDL_BUTTON_LEFT &&
+                if (event->button.button == SDL_BUTTON_LEFT && // 确保是左键点击
                     x >= toolbar->rect.x && x < toolbar->rect.x + toolbar->rect.w &&
                     y >= toolbar->rect.y && y < toolbar->rect.y + toolbar->rect.h) {
                     
                     // 检查是否点击了搜索框
-                    int search_box_w = 220;
-                    int search_box_h = BUTTON_SIZE;
-                    int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING;
-                    int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2;
+                    // 计算搜索框位置 宽度 高度  x坐标  y坐标
+                    int search_box_w = 220; // 搜索框宽度
+                    int search_box_h = BUTTON_SIZE; // 搜索框高度
+                    int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING; // 搜索框x坐标
+                    int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2; // 搜索框y坐标
                     
-                    if (x >= search_box_x && x < search_box_x + search_box_w &&
+                    if (x >= search_box_x && x < search_box_x + search_box_w && // 检查鼠标是否在搜索框区域内
                         y >= search_box_y && y < search_box_y + search_box_h) {
                         
                         // 检查是否点击了清除搜索按钮
                         if (toolbar->search_text[0] != '\0') {
-                            int clear_button_size = 16;
-                            int clear_button_x = search_box_x + search_box_w - clear_button_size - 4;
-                            int clear_button_y = search_box_y + (search_box_h - clear_button_size) / 2;
+                            int clear_button_size = 16; // 清除按钮大小
+                            int clear_button_x = search_box_x + search_box_w - clear_button_size - 4; // 清除按钮x坐标
+                            int clear_button_y = search_box_y + (search_box_h - clear_button_size) / 2; // 清除按钮y坐标
                             
-                            if (x >= clear_button_x && x < clear_button_x + clear_button_size &&
-                                y >= clear_button_y && y < clear_button_y + clear_button_size) {
+                            if (x >= clear_button_x && x < clear_button_x + clear_button_size && // 检查鼠标是否在清除按钮区域内
+                                y >= clear_button_y && y < clear_button_y + clear_button_size) { 
                                 // 点击了清除搜索按钮
-                                toolbar->search_text[0] = '\0';
-                                toolbar->search_cursor_pos = 0;
-                                toolbar_search(toolbar, "");
-                                printf("[DEBUG] 点击清除搜索按钮\n");
-                                return true;
+                                toolbar->search_text[0] = '\0'; // 将搜索文本设置为空字符串
+                                toolbar->search_cursor_pos = 0; // 将搜索光标位置设置为0
+                                toolbar_search(toolbar, ""); // 调用搜索函数 搜索文本为空
+                                printf("[DEBUG] 点击清除搜索按钮\n"); // 调试信息
+                                return true; // 返回true 表示事件已处理
                             }
                         }
                         
@@ -705,32 +702,32 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
                     }
                     
                     // 查找点击的按钮
-                    ToolbarButton *button = find_button_at_point(toolbar, x, y);
+                    ToolbarButton *button = find_button_at_point(toolbar, x, y); // 找到点击的按钮
                     if (button) {
-                        button->pressed = true;
-                        return true;
+                        button->pressed = true; // 设置按钮的按下状态为true
+                        return true; // 返回true 表示事件已处理
                     }
                 }
             }
             break;
             
-        case SDL_EVENT_MOUSE_BUTTON_UP:
+        case SDL_EVENT_MOUSE_BUTTON_UP: //鼠标释放事件
             {
-                int x = event->button.x;
-                int y = event->button.y;
+                int x = event->button.x; // 获取鼠标x坐标
+                int y = event->button.y; // 获取鼠标y坐标
                 
                 // 检查是否有按钮被按下
                 for (int i = 0; i < toolbar->button_count; i++) {
-                    ToolbarButton *button = &toolbar->buttons[i];
-                    if (button->pressed) {
-                        button->pressed = false;
+                    ToolbarButton *button = &toolbar->buttons[i]; // 获取按钮
+                    if (button->pressed) { // 检查按钮是否被按下 如果被按下
+                        button->pressed = false; // 设置按钮的按下状态为false 释放按钮
                         
                         // 检查鼠标释放是否在按钮区域内
                         if (x >= button->rect.x && x < button->rect.x + button->rect.w &&
                             y >= button->rect.y && y < button->rect.y + button->rect.h) {
                             
                             // 执行按钮操作
-                            execute_button_action(toolbar, button);
+                            execute_button_action(toolbar, button); // 执行按钮操作
                         }
                         
                         return true;
@@ -739,12 +736,12 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
             }
             break;
             
-        case SDL_EVENT_KEY_DOWN:
+        case SDL_EVENT_KEY_DOWN: //键盘按下事件
             // 如果搜索栏激活，处理键盘输入
-            if (toolbar->search_active) {
-                printf("[DEBUG] 收到按键: %d\n", event->key.scancode);
-                toolbar_search_handle_key(toolbar, event->key.scancode);
-                return true;
+            if (toolbar->search_active) { // 如果搜索栏激活
+                printf("[DEBUG] 收到按键: %d\n", event->key.scancode); // 调试信息
+                toolbar_search_handle_key(toolbar, event->key.scancode); // 处理键盘输入
+                return true; // 返回true 表示事件已处理
             }
             break;
             
@@ -752,8 +749,8 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
             // 如果搜索栏激活，处理文本输入
             if (toolbar->search_active) {
                 printf("[DEBUG] 收到文本输入: '%s'\n", event->text.text);
-                toolbar_search_handle_text(toolbar, event->text.text);
-                return true;
+                toolbar_search_handle_text(toolbar, event->text.text);  // 处理文本输入
+                return true; // 返回true 表示事件已处理
             }
             break;
             
@@ -765,28 +762,27 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
 }
 
 // 通知工具栏目录已更改
-void toolbar_notify_directory_changed(Toolbar *toolbar, const char *path) {
-    if (!toolbar || !path) {
-        return;
+void toolbar_notify_directory_changed(Toolbar *toolbar, const char *path) { //通知工具栏当前目录已经发生变化
+    if (!toolbar || !path) { // 验证工具栏和路径指针是否有效
+        return; // 如果无效，直接返回
     }
-    
-    // 添加到历史记录
-    add_to_history(toolbar, path);
+    add_to_history(toolbar, path); //将新路径添加到工具栏的历史记录中
 }
 
 // 绘制工具栏
 void toolbar_draw(Toolbar *toolbar) {
     if (!toolbar || !toolbar->app || !toolbar->app->renderer) {
         return;
-    }
-    SDL_Renderer *renderer = toolbar->app->renderer;
-    // 绘制工具栏背景
-    SDL_SetRenderDrawColor(renderer, TOOLBAR_BG_COLOR.r, TOOLBAR_BG_COLOR.g, TOOLBAR_BG_COLOR.b, TOOLBAR_BG_COLOR.a);
+    } // 验证工具栏、窗口和渲染器指针是否有效
+    SDL_Renderer *renderer = toolbar->app->renderer; // 获取渲染器
+    // 绘制工具栏背景 
+    SDL_SetRenderDrawColor(renderer, TOOLBAR_BG_COLOR.r, TOOLBAR_BG_COLOR.g, TOOLBAR_BG_COLOR.b, TOOLBAR_BG_COLOR.a); 
+    // 设置工具栏矩形区域
     SDL_FRect toolbar_frect = {
-        (float)toolbar->rect.x,
-        (float)toolbar->rect.y,
-        (float)toolbar->rect.w,
-        (float)toolbar->rect.h
+        (float)toolbar->rect.x, // 工具栏x坐标
+        (float)toolbar->rect.y, // 工具栏y坐标
+        (float)toolbar->rect.w, // 工具栏宽度
+        (float)toolbar->rect.h // 工具栏高度
     };
     SDL_RenderFillRect(renderer, &toolbar_frect);
     // 绘制工具栏边框
@@ -806,10 +802,10 @@ void toolbar_draw(Toolbar *toolbar) {
     };
     
     // 根据搜索状态选择背景颜色
-    SDL_Color search_bg_color = toolbar->search_active ? 
-        (SDL_Color){255, 255, 240, 255} : (SDL_Color){255, 255, 255, 255};
-    SDL_Color search_border_color = toolbar->search_active ? 
-        (SDL_Color){0, 120, 215, 255} : (SDL_Color){100, 100, 100, 255};
+    SDL_Color search_bg_color = toolbar->search_active ?  // 如果搜索栏激活 
+        (SDL_Color){255, 255, 240, 255} : (SDL_Color){255, 255, 255, 255}; // 如果搜索栏未激活
+    SDL_Color search_border_color = toolbar->search_active ?  // 如果搜索栏激活
+        (SDL_Color){0, 120, 215, 255} : (SDL_Color){100, 100, 100, 255}; // 如果搜索栏未激活
     
     // 背景
     SDL_SetRenderDrawColor(renderer, search_bg_color.r, search_bg_color.g, search_bg_color.b, search_bg_color.a);
@@ -819,19 +815,19 @@ void toolbar_draw(Toolbar *toolbar) {
     SDL_RenderRect(renderer, &search_box);
     // 显示输入内容`
     if (toolbar->search_active || toolbar->search_text[0] != '\0') {
-        // 这里只做简单文本渲染，实际可用TTF渲染
-        SDL_Color text_color = {30, 30, 30, 255};
-        if (toolbar->app->font && toolbar->search_text[0] != '\0') {
-            size_t text_len = strlen(toolbar->search_text);
-            SDL_Surface *text_surface = TTF_RenderText_Blended(toolbar->app->font, toolbar->search_text, text_len, text_color);
+        // 这里只做简单文本渲染
+        SDL_Color text_color = {30, 30, 30, 255}; // 文本颜色
+        if (toolbar->app->font && toolbar->search_text[0] != '\0') { // 如果字体和搜索文本不为空
+            size_t text_len = strlen(toolbar->search_text); // 获取搜索文本长度
+            SDL_Surface *text_surface = TTF_RenderText_Blended(toolbar->app->font, toolbar->search_text, text_len, text_color); // 渲染文本
             if (text_surface) {
-                SDL_Texture *text_tex = SDL_CreateTextureFromSurface(renderer, text_surface);
+                SDL_Texture *text_tex = SDL_CreateTextureFromSurface(renderer, text_surface); // 创建纹理
                 if (text_tex) {
-                    SDL_FRect dst = {(float)(search_box_x + 8), (float)(search_box_y + (search_box_h - text_surface->h) / 2), (float)text_surface->w, (float)text_surface->h};
-                    SDL_RenderTexture(renderer, text_tex, NULL, &dst);
-                    SDL_DestroyTexture(text_tex);
+                    SDL_FRect dst = {(float)(search_box_x + 8), (float)(search_box_y + (search_box_h - text_surface->h) / 2), (float)text_surface->w, (float)text_surface->h}; // 设置文本位置
+                    SDL_RenderTexture(renderer, text_tex, NULL, &dst); // 渲染文本
+                    SDL_DestroyTexture(text_tex); // 销毁纹理
                 }
-                SDL_DestroySurface(text_surface);
+                SDL_DestroySurface(text_surface); // 销毁文本表面
             }
         }
         
@@ -895,58 +891,58 @@ void toolbar_draw(Toolbar *toolbar) {
     }
 }
 
-void toolbar_search_start(Toolbar *toolbar) {
-    if (!toolbar) return;
-    printf("[DEBUG] 搜索栏激活\n");
-    toolbar->search_active = true;
+void toolbar_search_start(Toolbar *toolbar) {  // 启动搜索功能
+    if (!toolbar) return; // 验证工具栏指针是否有效
+    printf("[DEBUG] 搜索栏激活\n"); // 调试信息
+    toolbar->search_active = true; // 设置搜索栏激活状态为true
     
     // 不清除现有搜索文本，保持用户之前的搜索内容
     // 如果搜索文本为空，设置光标位置为0
     if (toolbar->search_text[0] == '\0') {
-        toolbar->search_cursor_pos = 0;
+        toolbar->search_cursor_pos = 0; // 如果搜索文本为空，设置光标位置为0
     } else {
         // 如果已有搜索文本，将光标移到文本末尾
-        toolbar->search_cursor_pos = strlen(toolbar->search_text);
+        toolbar->search_cursor_pos = strlen(toolbar->search_text); // 如果已有搜索文本，将光标移到文本末尾
     }
     
     // 启用SDL文本输入模式，传入窗口参数
     if (toolbar->app && toolbar->app->window) {
-        SDL_StartTextInput(toolbar->app->window);
-        printf("[DEBUG] SDL文本输入已启用\n");
+        SDL_StartTextInput(toolbar->app->window); // 启用SDL文本输入模式
+        printf("[DEBUG] SDL文本输入已启用\n"); // 调试信息
     } else {
-        printf("[WARNING] 无法启用SDL文本输入：窗口指针无效\n");
+        printf("[WARNING] 无法启用SDL文本输入：窗口指针无效\n"); // 警告信息
     }
 }
 void toolbar_search_stop(Toolbar *toolbar) {
-    if (!toolbar) return;
-    printf("[DEBUG] 搜索栏停止\n");
-    toolbar->search_active = false;
+    if (!toolbar) return; // 验证工具栏指针是否有效
+    printf("[DEBUG] 搜索栏停止\n"); // 调试信息
+    toolbar->search_active = false; // 设置搜索栏激活状态为false
     
     // 停止SDL文本输入模式，传入窗口参数
     if (toolbar->app && toolbar->app->window) {
-        SDL_StopTextInput(toolbar->app->window);
-        printf("[DEBUG] SDL文本输入已停止\n");
+        SDL_StopTextInput(toolbar->app->window); // 停止SDL文本输入模式
+        printf("[DEBUG] SDL文本输入已停止\n"); // 调试信息
     } else {
-        printf("[WARNING] 无法停止SDL文本输入：窗口指针无效\n");
+        printf("[WARNING] 无法停止SDL文本输入：窗口指针无效\n"); // 警告信息
     }
     
     // 不清除搜索文本，保持搜索结果可见
     // 用户可以通过点击搜索框重新激活搜索，或者通过其他方式清除搜索
 }
-void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
-    if (!toolbar || !toolbar->search_active || !text) return;
+void toolbar_search_handle_text(Toolbar *toolbar, const char *text) { // 处理文本输入    
+    if (!toolbar || !toolbar->search_active || !text) return; // 验证工具栏、搜索状态和文本指针是否有效
     printf("[DEBUG] 处理文本输入: '%s', 当前文本: '%s', 光标位置: %d\n", 
-           text, toolbar->search_text, toolbar->search_cursor_pos);
+           text, toolbar->search_text, toolbar->search_cursor_pos); // 调试信息
     
-    size_t len = strlen(toolbar->search_text);
-    size_t tlen = strlen(text);
-    if (len + tlen < sizeof(toolbar->search_text) - 1) {
+    size_t len = strlen(toolbar->search_text); // 获取搜索文本长度
+    size_t tlen = strlen(text); // 获取输入文本长度
+    if (len + tlen < sizeof(toolbar->search_text) - 1) { // 如果搜索文本长度和输入文本长度之和小于搜索文本数组大小减1
         // 在光标位置插入文本
-        memmove(&toolbar->search_text[toolbar->search_cursor_pos + tlen], 
+        memmove(&toolbar->search_text[toolbar->search_cursor_pos + tlen],
                &toolbar->search_text[toolbar->search_cursor_pos], 
-               len - toolbar->search_cursor_pos + 1);
-        memcpy(&toolbar->search_text[toolbar->search_cursor_pos], text, tlen);
-        toolbar->search_cursor_pos += tlen;
+               len - toolbar->search_cursor_pos + 1);           // 将搜索文本从光标位置开始向后移动
+        memcpy(&toolbar->search_text[toolbar->search_cursor_pos], text, tlen); // 将输入文本插入到搜索文本中
+        toolbar->search_cursor_pos += tlen; // 更新光标位置
         printf("[DEBUG] 文本更新后: '%s', 光标位置: %d\n", 
                toolbar->search_text, toolbar->search_cursor_pos);
         
@@ -954,10 +950,10 @@ void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
         toolbar_search(toolbar, toolbar->search_text);
     }
 }
-void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
-    if (!toolbar || !toolbar->search_active) return;
-    size_t len = strlen(toolbar->search_text);
-    switch (scancode) {
+void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {// 处理键盘输入
+    if (!toolbar || !toolbar->search_active) return; // 验证工具栏、搜索状态是否有效
+    size_t len = strlen(toolbar->search_text); // 获取搜索文本长度
+    switch (scancode) { // 根据键盘按键执行不同的操作
         case SDL_SCANCODE_BACKSPACE:
             if (toolbar->search_cursor_pos > 0 && len > 0) {
                 // 从光标位置向前删除一个字符

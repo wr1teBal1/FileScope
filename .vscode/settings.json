@@ -66,6 +66,7 @@
         "initializer_list": "c",
         "span": "c",
         "shlobj.h": "c",
-        "errno.h": "c"
+        "errno.h": "c",
+        "sdl_close_code.h": "c"
     }
 }
