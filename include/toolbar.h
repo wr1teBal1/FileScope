@@ -91,7 +91,7 @@ void toolbar_search_stop(Toolbar *toolbar);
 void toolbar_search_handle_text(Toolbar *toolbar, const char *text);
 void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode);
 
-// 地址栏相关API
+// 地址栏相关API   （暂时不实现）
 void toolbar_address_bar_start(Toolbar *toolbar);
 void toolbar_address_bar_stop(Toolbar *toolbar);
 void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text);
