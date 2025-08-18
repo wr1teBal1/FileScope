@@ -77,7 +77,7 @@ struct Sidebar {
     SDL_Color hover_color;                     // 悬停颜色
     SDL_Color selected_color;                  // 选中颜色
     SDL_Color separator_color;                 // 分隔线颜色
-    int scroll_offset;                         // 滚动偏移
+    int scroll_offset;                         // 垂直滚动偏移量
     SidebarItemSelectedCallback on_item_selected;  // 项目选中回调
 };
 

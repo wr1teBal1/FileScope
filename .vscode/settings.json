@@ -67,6 +67,8 @@
         "span": "c",
         "shlobj.h": "c",
         "errno.h": "c",
-        "sdl_close_code.h": "c"
+        "sdl_close_code.h": "c",
+        "sdl_error.h": "c",
+        "numbers": "c"
     }
 }

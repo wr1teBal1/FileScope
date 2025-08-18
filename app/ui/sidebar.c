@@ -24,35 +24,35 @@
 #define SIDEBAR_SEPARATOR_HEIGHT 1
 
 // 前向声明私有函数
-static void sidebar_add_quick_access_items(Sidebar *sidebar);
+static void sidebar_add_quick_access_items(Sidebar *sidebar); 
 static void sidebar_add_drives(Sidebar *sidebar);
 static void sidebar_add_separator(Sidebar *sidebar);
 static void sidebar_add_item(Sidebar *sidebar, SidebarItemType type, const char *name, const char *path);
 static void sidebar_draw_item(Sidebar *sidebar, int index);
 static int sidebar_get_item_at(Sidebar *sidebar, int x, int y);
-static SDL_Texture* load_icon(Sidebar *sidebar, SidebarItemType type);
+static SDL_Texture* load_icon(Sidebar *sidebar, SidebarItemType type);  //加载图标
 static bool get_special_folder_path_wrapper(SpecialFolder folder, char *path, size_t path_size);
 
 // 创建侧边栏
 Sidebar* sidebar_new(struct Window *app) {
     if (!app) {
         return NULL;
-    }
+    }   // 检查app是否为空
 
-    Sidebar *sidebar = (Sidebar*)calloc(1, sizeof(Sidebar));
+    Sidebar *sidebar = (Sidebar*)calloc(1, sizeof(Sidebar)); // 使用 calloc 分配内存，calloc 会将内存初始化为0
     if (!sidebar) {
         return NULL;
-    }
+    }   // 检查sidebar是否为空
 
-    sidebar->app = app;
-    sidebar->rect.x = 0;
+    sidebar->app = app;    // 将app赋值给sidebar
+    sidebar->rect.x = 0;   // 设置x坐标
     sidebar->rect.y = TOOLBAR_HEIGHT; // 从工具栏底部开始
-    sidebar->rect.w = SIDEBAR_WIDTH;
+    sidebar->rect.w = SIDEBAR_WIDTH;  // 设置宽度
     sidebar->rect.h = SDL_WINDOW_HEIGHT - TOOLBAR_HEIGHT; // 调整高度，减去工具栏高度
-    sidebar->item_count = 0;
-    sidebar->selected_index = -1;
-    sidebar->hover_index = -1;
-    sidebar->scroll_offset = 0;
+    sidebar->item_count = 0;   // 项目数量初始化为0
+    sidebar->selected_index = -1;   // 选中项索引初始化为-1（无选中）
+    sidebar->hover_index = -1;   // 悬停项索引初始化为-1（无悬停）
+    sidebar->scroll_offset = 0;   // 滚动偏移量初始化为0
     
     // 设置颜色
     sidebar->bg_color = (SDL_Color){240, 240, 245, 255};         // 浅灰色背景
@@ -70,123 +70,139 @@ Sidebar* sidebar_new(struct Window *app) {
     // 添加驱动器列表
     sidebar_add_drives(sidebar);
 
-    return sidebar;
+    return sidebar;          //返回创建的侧边栏
 }
 
 // 释放侧边栏
 void sidebar_free(Sidebar *sidebar) {
     if (!sidebar) {
-        return;
+        return;   // 如果侧边栏为空，直接返回
     }
     
     // 释放项目资源
     for (int i = 0; i < sidebar->item_count; i++) {
         if (sidebar->items[i].name) {
-            free(sidebar->items[i].name);
+            free(sidebar->items[i].name);   // 释放项目名称
         }
         if (sidebar->items[i].path) {
-            free(sidebar->items[i].path);
+            free(sidebar->items[i].path);   // 释放项目路径
         }
         if (sidebar->items[i].icon) {
-            SDL_DestroyTexture(sidebar->items[i].icon);
+            SDL_DestroyTexture(sidebar->items[i].icon);   //使用 SDL_DestroyTexture() 释放SDL纹理资源
         }
     }
-    
-    free(sidebar);
+        
+        free(sidebar);   // 释放侧边栏本身
+//         为什么需要这行代码
+// 1. 防止内存泄漏
+// 如果不调用 free(sidebar)，这块内存永远不会被释放
+// 程序运行时间越长，泄漏的内存越多
+// 2. 资源完整性
+// 确保所有分配的资源都被正确释放
+// 包括结构体本身和其包含的所有子资源
+// 3. 系统稳定性
+// 及时释放不需要的内存
+// 避免系统内存耗尽
+// 类比理解
+// 想象一下：
+// calloc 就像向银行借钱（分配内存）
+// 使用内存就像使用借来的钱
+// free 就像还钱给银行（释放内存）
+// 如果不还钱（不调用 free），银行就会一直记着这笔债（内存泄漏），最终可能导致银行破产（系统内存耗尽）。
+// 所以 free(sidebar) 是内存管理的最后一步，确保程序"借"来的所有内存都被正确"归还"。
 }
 
 // 处理侧边栏事件
-bool sidebar_handle_event(Sidebar *sidebar, SDL_Event *event) {
-    if (!sidebar || !event) {
-        return false;
-    }
+bool sidebar_handle_event(Sidebar *sidebar, SDL_Event *event) { // 事件处理
+    if (!sidebar || !event) return false; // 参数检查
     
-    // 鼠标移动事件
-    if (event->type == SDL_EVENT_MOUSE_MOTION) {
-        int x = event->motion.x;
-        int y = event->motion.y;
-        
-        // 检查鼠标是否在侧边栏区域内
-        if (x >= sidebar->rect.x && x < sidebar->rect.x + sidebar->rect.w &&
-            y >= sidebar->rect.y && y < sidebar->rect.y + sidebar->rect.h) {
+    switch (event->type) {
+        // 鼠标移动事件
+        case SDL_EVENT_MOUSE_MOTION: {
+            int x = event->motion.x;
+            int y = event->motion.y;// 鼠标坐标
             
-            // 更新悬停项索引
-            sidebar->hover_index = sidebar_get_item_at(sidebar, x, y);
-            return true;
-        } else {
-            // 鼠标移出侧边栏区域
-            sidebar->hover_index = -1;
-        }
-    }
-    
-    // 鼠标按下事件
-    else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-        if (event->button.button == SDL_BUTTON_LEFT) {
-            int x = event->button.x;
-            int y = event->button.y;
-            
-            // 检查鼠标是否在侧边栏区域内
+            // 检查鼠标是否在侧边栏边界内
             if (x >= sidebar->rect.x && x < sidebar->rect.x + sidebar->rect.w &&
                 y >= sidebar->rect.y && y < sidebar->rect.y + sidebar->rect.h) {
                 
-                // 获取点击的项目
-                int index = sidebar_get_item_at(sidebar, x, y);
-                if (index >= 0 && index < sidebar->item_count) {
-                    // 忽略分隔线
-                    if (sidebar->items[index].type == SIDEBAR_ITEM_SEPARATOR) {
-                        return true;
-                    }
-                    
-                    // 更新选中项
-                    sidebar->selected_index = index;
-                    
-                    // 调用选中回调
-                    if (sidebar->on_item_selected && sidebar->items[index].path) {
-                        sidebar->on_item_selected(sidebar, sidebar->items[index].path);
-                    }
-                    
+                int item_index = sidebar_get_item_at(sidebar, x, y); // 获取项目索引
+                
+                // 如果鼠标悬停在其他项目上，则更新悬停项索引
+                if (item_index != sidebar->hover_index) {
+                    sidebar->hover_index = item_index;
                     return true;
                 }
+            } else {
+                   // 如果鼠标不在侧边栏边界内，则清除悬停项索引
+                    sidebar->hover_index = -1;
+                    return true;
+                
             }
+            break;
         }
-    }
-    
-    // 鼠标滚轮事件
-    else if (event->type == SDL_EVENT_MOUSE_WHEEL) {
-        int x = event->wheel.mouse_x;
-        int y = event->wheel.mouse_y;
-        
-        // 检查鼠标是否在侧边栏区域内
-        if (x >= sidebar->rect.x && x < sidebar->rect.x + sidebar->rect.w &&
-            y >= sidebar->rect.y && y < sidebar->rect.y + sidebar->rect.h) {
-            
-            // 更新滚动偏移
-            sidebar->scroll_offset -= event->wheel.y * 20; // 滚动速度因子
-            
-            // 限制滚动范围
-            int max_scroll = sidebar->item_count * SIDEBAR_ITEM_HEIGHT - sidebar->rect.h;
-            if (max_scroll < 0) max_scroll = 0;
-            
-            if (sidebar->scroll_offset < 0) {
-                sidebar->scroll_offset = 0;
-            } else if (sidebar->scroll_offset > max_scroll) {
-                sidebar->scroll_offset = max_scroll;
+        // 鼠标点击事件
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            if (event->button.button == SDL_BUTTON_LEFT) {
+                int x = event->button.x;
+                int y = event->button.y;
+                
+                // 检查鼠标是否在侧边栏边界内
+                if (x >= sidebar->rect.x && x < sidebar->rect.x + sidebar->rect.w &&
+                    y >= sidebar->rect.y && y < sidebar->rect.y + sidebar->rect.h) {
+                    
+                        // 获取项目索引
+                    int item_index = sidebar_get_item_at(sidebar, x, y);
+
+                    if (item_index >= 0 && item_index < sidebar->item_count) {
+                        sidebar->selected_index = item_index; // 设置选中项索引
+                        
+                        // 如果设置了回调函数则调用
+                        if (sidebar->on_item_selected && sidebar->items[item_index].path) {
+                            //双重检查，1.防止回调函数为空 2.防止项目路径为空
+                            // 回调函数的作用是通知主窗口切换到指定路径
+                            sidebar->on_item_selected(sidebar, sidebar->items[item_index].path);
+                            //1传递侧边栏本身 2传递项目路径
+                        }
+                        return true;
+                    }
+                }
             }
-            
-            return true;
+            break;
         }
+        // 鼠标滚动事件
+        case SDL_EVENT_MOUSE_WHEEL: {
+           if(event->wheel.y != 0)
+
+           //计算滚动的距离
+           sidebar->scroll_offset += event->wheel.y * 20; // 20为滚动速度，可以根据需要调整
+
+           //限制滚动范围
+           int max_scroll = sidebar->item_count * SIDEBAR_ITEM_HEIGHT - sidebar->rect.h;
+           //内容总高度 − 可见区域高度。如果内容比可见区域还短会得到负数，所以立刻设为 0（表示不需要滚动）。
+           if(max_scroll  < 0)  max_scroll = 0; 
+
+           if(sidebar->scroll_offset > max_scroll ) sidebar->scroll_offset = max_scroll ;// 限制最大滚动距离
+           if(sidebar->scroll_offset < 0) sidebar->scroll_offset = 0;// 限制最小滚动距离
+
+           return true;
+        }
+        break;
     }
     
     return false;
 }
 
 // 绘制侧边栏
-void sidebar_draw(Sidebar *sidebar) {
-    if (!sidebar || !sidebar->app || !sidebar->app->renderer) {
-        return;
-    }
+    void sidebar_draw(Sidebar *sidebar){
+        //先检查三个参数
+        if(!sidebar||!sidebar->app||!sidebar->app->renderer)
+        {
+            return;
+        }
     
-    SDL_Renderer *renderer = sidebar->app->renderer;
+    //获取渲染器 
+     SDL_Renderer *renderer = sidebar->app->renderer;
     
     // 绘制侧边栏背景
     SDL_SetRenderDrawColor(renderer, 
@@ -194,15 +210,16 @@ void sidebar_draw(Sidebar *sidebar) {
                           sidebar->bg_color.g, 
                           sidebar->bg_color.b, 
                           sidebar->bg_color.a);
+                          //颜色确定
     SDL_FRect frect = {
         (float)sidebar->rect.x,
         (float)sidebar->rect.y,
         (float)sidebar->rect.w,
         (float)sidebar->rect.h
-    };
+    }; //绘制浮点矩形
     SDL_RenderFillRect(renderer, &frect);
     
-            // 绘制侧边栏右边框
+     // 绘制侧边栏右边框
     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderLine(renderer, 
                   (float)(sidebar->rect.x + sidebar->rect.w - 1), 
@@ -219,7 +236,7 @@ void sidebar_draw(Sidebar *sidebar) {
 // 设置项目选中回调
 void sidebar_set_item_selected_callback(Sidebar *sidebar, SidebarItemSelectedCallback callback) {
     if (sidebar) {
-        sidebar->on_item_selected = callback;
+        sidebar->on_item_selected = callback;// 设置回调函数
     }
 }
 
@@ -273,7 +290,7 @@ static void sidebar_add_drives(Sidebar *sidebar) {
     }
     
     // 获取驱动器列表
-    DriveInfo drives[26];
+    DriveInfo drives[26];// 最多支持26个驱动器
     int drive_count = get_drives(drives, 26);
     
     for (int i = 0; i < drive_count; i++) {
@@ -299,21 +316,21 @@ static void sidebar_add_drives(Sidebar *sidebar) {
 static void sidebar_add_separator(Sidebar *sidebar) {
     if (!sidebar || sidebar->item_count >= MAX_SIDEBAR_ITEMS) {
         return;
-    }
+    }// 检查参数
     
-    int index = sidebar->item_count++;
-    SidebarItem *item = &sidebar->items[index];
+    int index =  sidebar->item_count ++  ;                   // 获取索引
+    SidebarItem *item = &sidebar->items[index];                // 获取项指针   
     
-    item->type = SIDEBAR_ITEM_SEPARATOR;
-    item->name = NULL;
-    item->path = NULL;
-    item->icon = NULL;
-    item->state = SIDEBAR_STATE_NORMAL;
+    item->type = SIDEBAR_ITEM_SEPARATOR;                              // 设置类型为分隔线
+    item->name = NULL;                                                // 名称为空
+    item->path = NULL;                                                // 路径为空
+    item->icon = NULL;                                                // 图标为空
+    item->state = SIDEBAR_STATE_NORMAL;                              // 设置状态为正常
     
     // 设置分隔线区域
     item->rect.x = sidebar->rect.x;
-    item->rect.y = sidebar->rect.y + index * SIDEBAR_ITEM_HEIGHT;
-    item->rect.w = sidebar->rect.w;
+    item->rect.y = sidebar->rect.y + SIDEBAR_ITEM_PADDING + index * SIDEBAR_ITEM_HEIGHT; // 计算Y坐标
+    item->rect.w = sidebar->rect.w;                                                    
     item->rect.h = SIDEBAR_SEPARATOR_HEIGHT;
 }
 
@@ -323,17 +340,17 @@ static SDL_Texture* load_icon(Sidebar *sidebar, SidebarItemType type) {
         return NULL;
     }
     
-    SDL_Renderer *renderer = sidebar->app->renderer;
-    SDL_Texture *texture = NULL;
+    SDL_Renderer *renderer = sidebar->app->renderer; // 获取渲染器
+    SDL_Texture *texture = NULL;                      // 图标纹理
     
     // 根据项目类型加载不同的图标
     const char *icon_path = NULL;
     
     switch (type) {
-        case SIDEBAR_ITEM_QUICK_ACCESS:
+        case SIDEBAR_ITEM_QUICK_ACCESS:  // 快速访问图标
             icon_path = "assets/icons/folder.png";
             break;
-        case SIDEBAR_ITEM_DRIVE:
+        case SIDEBAR_ITEM_DRIVE:  // 驱动器图标
             icon_path = "assets/icons/drive.png";
             break;
         default:
@@ -388,7 +405,7 @@ static void sidebar_add_item(Sidebar *sidebar, SidebarItemType type, const char 
     
     // 设置项目区域
     item->rect.x = sidebar->rect.x;
-    item->rect.y = sidebar->rect.y + index * SIDEBAR_ITEM_HEIGHT;
+    item->rect.y = sidebar->rect.y + SIDEBAR_ITEM_PADDING + index * SIDEBAR_ITEM_HEIGHT;
     item->rect.w = sidebar->rect.w;
     item->rect.h = SIDEBAR_ITEM_HEIGHT;
 }
@@ -628,6 +645,6 @@ void sidebar_refresh_drives(Sidebar *sidebar) {
     // 更新项目位置
     for (int i = 0; i < sidebar->item_count; i++) {
         sidebar->items[i].rect.x = sidebar->rect.x;
-        sidebar->items[i].rect.y = sidebar->rect.y + i * SIDEBAR_ITEM_HEIGHT;
+        sidebar->items[i].rect.y = sidebar->rect.y + SIDEBAR_ITEM_PADDING + i * SIDEBAR_ITEM_HEIGHT;
     }
 }

@@ -1,9 +1,32 @@
 /*
- * 主窗口模块
- * 职责：
- * 1. 创建和管理主窗口
- * 2. 包含文件列表视图、侧边栏、工具栏等UI组件
- * 3. 处理窗口事件
+ * 主窗口模块（与 sidebar.c 风格一致的整体装配解读）
+ * 目标：装配各 UI 组件（文件列表/侧边栏/工具栏/右键菜单），并负责事件分发与布局。
+ * 
+ * 组件装配与依赖：
+ * - FileListView：核心内容区，负责目录呈现与交互；
+ * - Sidebar：左侧导航区，负责路径快捷入口与驱动器跳转；
+ * - Toolbar：上方操作区，负责历史导航/视图切换/搜索过滤；
+ * - ContextMenu：上下文动作入口，依赖 FileListView 触发重命名/刷新等。
+ * 
+ * 事件分发优先级（先捕获悬浮层，风格与 sidebar 一致）：
+ * 1) ContextMenu（可见时独占处理）
+ * 2) Toolbar（按钮与搜索输入）
+ * 3) FileListView（滚动/选择/双击/重命名）
+ * 4) Sidebar（项目选择/滚动）
+ * 
+ * 绘制顺序（保证视觉层级）：
+ * - FileListView -> Toolbar -> Sidebar -> ContextMenu（最上层）。
+ * 
+ * 布局策略（与 sidebar.c 保持常量一致）：
+ * - FileListView 视口：x=SIDEBAR_WIDTH, y=TOOLBAR_HEIGHT；
+ * - Toolbar：高度固定为 TOOLBAR_HEIGHT；
+ * - Sidebar：宽度固定为 SIDEBAR_WIDTH，起点 y=TOOLBAR_HEIGHT。
+ * 
+ * 生命周期：
+ * - new：创建并互相连接组件与回调（如目录变更 -> toolbar 历史；sidebar 选中 -> file_list 加载）。
+ * - resize：依据窗口尺寸更新各组件的矩形区域；
+ * - draw：按“先底层后顶层”的顺序绘制；
+ * - free：对称释放各组件。
  */
 
 #include "main_window.h"
