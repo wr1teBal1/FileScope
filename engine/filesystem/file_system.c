@@ -10,14 +10,12 @@
 
 #include "file_system.h"
 #include "sidebar.h"
-#include "path_resolver.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <limits.h>
 // #include <pwd.h>
 
 #ifdef _WIN32
@@ -153,35 +151,15 @@ bool fs_path_exists(const char *path) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return false;
     }
-    
-    // 临时回退方案：如果路径解析器有问题，直接使用原始路径
+    //
     struct stat st;
     if (stat(path, &st) == 0) {
         fs_set_error(FS_ERROR_NONE);
         return true;
     }
-    
-    // 如果直接检查失败，尝试使用路径解析器
-    PathInfo *info = path_resolve(path, NULL);
-    if (!info || !info->is_valid) {
-        if (info) {
-            path_info_free(info);
-        }
-        fs_set_error_from_errno();
-        return false;
-    }
-    
-    // 使用解析后的绝对路径检查文件是否存在
-    bool exists = false;
-    if (stat(info->absolute_path, &st) == 0) {
-        fs_set_error(FS_ERROR_NONE);
-        exists = true;
-    } else {
-        fs_set_error_from_errno();
-    }
-    
-    path_info_free(info);
-    return exists;
+
+    fs_set_error_from_errno();
+    return false;
 }
 
 // 检查是否为目录
@@ -505,7 +483,6 @@ const char* fs_get_filename(const char *path) {
         return NULL;
     }
 
-    // 临时回退方案：如果路径解析器有问题，使用传统方法
     // 查找最后一个路径分隔符（支持Unix和Windows）
     const char *slash = strrchr(path, '/');
     const char *backslash = strrchr(path, '\\');
@@ -559,8 +536,7 @@ const char* fs_get_directory(const char *path) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return NULL;
     }
-    
-    // 临时回退方案：如果路径解析器有问题，使用传统方法
+
     strncpy(dirname, path, sizeof(dirname) - 1);
     dirname[sizeof(dirname) - 1] = '\0';
 
@@ -598,8 +574,7 @@ char* fs_combine_path(const char *path1, const char *path2) {
         fs_set_error(FS_ERROR_INVALID_NAME);
         return NULL;
     }
-    
-    // 临时回退方案：如果路径解析器有问题，使用传统方法
+
     size_t len1 = strlen(path1);
     size_t len2 = strlen(path2);
     size_t len = len1 + len2 + 2; // +2 for separator and '\0'
@@ -644,33 +619,19 @@ char* fs_combine_path(const char *path1, const char *path2) {
 
 // 获取绝对路径
 char* fs_get_absolute_path(const char *path) {
-    if (!path) {
-        fs_set_error(FS_ERROR_INVALID_NAME);
+    // if (!path) {
+    //     fs_set_error(FS_ERROR_INVALID_NAME);
+    //     return NULL;
+    // }
+
+    // char *abs_path = realpath(path, NULL);
+    // if (!abs_path) {
+    //     fs_set_error_from_errno();
         return NULL;
-    }
-    
-    // 临时回退方案：如果路径解析器有问题，使用传统方法
-    char *abs_path = NULL;
-    
-    // 检查是否为绝对路径
-    if (path[0] == '/' || (path[0] && path[1] == ':')) {
-        // 已经是绝对路径，直接复制
-        abs_path = strdup(path);
-        if (abs_path) {
-            fs_set_error(FS_ERROR_NONE);
-            return abs_path;
-        }
-    }
-    
-    // 尝试使用路径解析器
-    abs_path = path_to_absolute(path, fs_get_current_directory());
-    if (abs_path) {
-        fs_set_error(FS_ERROR_NONE);
-    } else {
-        fs_set_error(FS_ERROR_INVALID_NAME);
-    }
-    
-    return abs_path;
+    // }
+
+    // fs_set_error(FS_ERROR_NONE);
+    // return abs_path;
 }
 
 // 获取相对路径
@@ -830,28 +791,17 @@ int get_drives(DriveInfo *drives, int max_count) {
         
         char root_path[4] = {drive_ptr[0], ':', '\\', 0};
         
-        // 使用Unicode版本的API来正确处理中文标签
-        wchar_t volume_name_w[256] = {0};
-        wchar_t fs_name_w[32] = {0};
-        wchar_t root_path_w[4];
-        
-        // 转换路径为宽字符
-        MultiByteToWideChar(CP_ACP, 0, root_path, -1, root_path_w, 4);
-        
-        if (GetVolumeInformationW(
-                root_path_w,
-                volume_name_w,
-                sizeof(volume_name_w) / sizeof(wchar_t),
+        if (GetVolumeInformationA(
+                root_path,
+                volume_name,
+                sizeof(volume_name),
                 &serial_number,
                 &max_component_length,
                 &fs_flags,
-                fs_name_w,
-                sizeof(fs_name_w) / sizeof(wchar_t))) {
-            // 转换Unicode字符串为UTF-8
-            WideCharToMultiByte(CP_UTF8, 0, volume_name_w, -1, 
-                               drives[count].label, sizeof(drives[count].label), NULL, NULL);
-            WideCharToMultiByte(CP_UTF8, 0, fs_name_w, -1, 
-                               drives[count].fs_type, sizeof(drives[count].fs_type), NULL, NULL);
+                fs_name,
+                sizeof(fs_name))) {
+            strncpy(drives[count].label, volume_name, sizeof(drives[count].label) - 1);
+            strncpy(drives[count].fs_type, fs_name, sizeof(drives[count].fs_type) - 1);
         }
         
         // 获取驱动器大小信息

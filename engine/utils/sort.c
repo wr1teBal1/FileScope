@@ -8,6 +8,7 @@
  */
 
 #include "sort.h"
+#include "../filesystem/path_resolver.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -446,15 +447,24 @@ static int compare_by_field(const FileItem *item1, const FileItem *item2, SortFi
             
         case SORT_FIELD_EXTENSION:
             {
-                const char *ext1 = get_file_extension(item1->name);
-                const char *ext2 = get_file_extension(item2->name);
+                char *ext1 = path_get_extension(item1->name);
+                char *ext2 = path_get_extension(item2->name);
                 if (ext1 && ext2) {
                     if (case_sensitive) {
                         result = strcmp(ext1, ext2);
                     } else {
                         result = strcasecmp(ext1, ext2);
                     }
+                } else if (ext1) {
+                    result = 1;
+                } else if (ext2) {
+                    result = -1;
+                } else {
+                    result = 0;
                 }
+                // 释放内存
+                free(ext1);
+                free(ext2);
             }
             break;
             
@@ -475,15 +485,7 @@ static int compare_by_field(const FileItem *item1, const FileItem *item2, SortFi
 }
 
 // 获取文件扩展名
-const char* get_file_extension(const char *filename) {
-    if (!filename) return NULL;
-    
-    const char *dot = strrchr(filename, '.');
-    if (dot && dot != filename) {
-        return dot + 1;
-    }
-    return NULL;
-}
+// get_file_extension函数已移除，使用path_get_extension替代
 
 // 自然排序比较函数
 int natural_string_compare(const char *str1, const char *str2, bool case_sensitive) {

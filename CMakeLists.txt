@@ -20,7 +20,7 @@ add_executable(FileScope
     engine/render/icon_cache.c
     engine/render/ui_renderer.c
     engine/utils/sort.c
-    engine/utils/string_utils.c
+    # engine/utils/string_utils.c  # 已删除：只有注释没有实现
     engine/utils/config.c
     platform/sdl/events.c
     platform/sdl/init_sdl.c
