@@ -1,1352 +1,544 @@
-# Toolbar模块使用指南
+# Toolbar 模块使用与扩展指南（可复制修复版）
 
-## 概述
+## 目标与读者
+- 本文档面向需要维护/扩展 `Toolbar` 的开发者。
+- 提供：
+  - 未来修改与新增功能的清晰步骤与约束（稳定扩展）。
+  - 对当前实现的详细解读（按职责与代码路径组织）。
+  - 若误删实现中的某一段，可直接从文档复制相应“修复片段”粘贴回去（最小可用修复）。
 
-Toolbar模块是FileScope应用程序的核心UI组件之一，负责提供文件浏览的导航和控制功能。该模块实现了完整的工具栏界面，包括按钮管理、事件处理、历史记录、搜索功能和地址栏等特性。
+- 相关文件：`app/ui/toolbar.c`、`include/toolbar.h`
 
-**文件位置**: `src/toolbar.c` 和 `include/toolbar.h`
+## 快速索引
+- 架构与职责
+- 扩展改造手册（新增按钮/交互的标准流程）
+- 代码详解（带行号引用，便于精确定位）
+- 粘贴修复片段（误删后的最小可用实现）
+- 自检清单与故障定位
 
-## 模块结构
+---
 
-### 核心数据结构
+## 架构与职责
+- 视图层（绘制）
+  - 绘制工具栏背景、边框、按钮图标、地址栏、搜索框与光标/清除按钮。
+- 交互层（事件）
+  - 命中检测、按钮按下/抬起；搜索/地址栏的互斥激活；文本输入与按键处理。
+- 业务层（状态）
+  - 历史记录（路径数组、当前索引）；导航行为（后退/前进/上级/主目录/刷新/视图切换）；
+  - 搜索过滤调用与地址栏导航。
 
-#### ToolbarButtonType 枚举
+- 布局（当前约定）
+  - 左侧：后退、前进、刷新、视图；`UP/HOME` 不布局（`enabled=false, rect=0`）。
+  - 中部：地址栏（宽度动态 140–320）。
+  - 右侧：搜索按钮 + 搜索框（固定宽 220）。
+
+- 常量
 ```c
-typedef enum {
-    BUTTON_BACK,        // 后退按钮
-    BUTTON_FORWARD,     // 前进按钮
-    BUTTON_UP,          // 上一级按钮
-    BUTTON_HOME,        // 主目录按钮
-    BUTTON_REFRESH,     // 刷新按钮
-    BUTTON_SEARCH,      // 搜索按钮
-    BUTTON_VIEW,        // 视图切换按钮
-    BUTTON_COUNT        // 按钮总数
-} ToolbarButtonType;
+#define TOOLBAR_HEIGHT 40
+#define BUTTON_PADDING 5
+#define BUTTON_SIZE 30
+#define BUTTON_SPACING 10
 ```
 
-#### ToolbarButton 结构体
-```c
-typedef struct {
-    ToolbarButtonType type;    // 按钮类型
-    SDL_Rect rect;             // 按钮区域
-    const char *tooltip;       // 提示文本
-    bool enabled;              // 是否启用
-    bool hovered;              // 是否悬停
-    bool pressed;              // 是否按下
-} ToolbarButton;
+---
+
+## 扩展改造手册（标准流程）
+- 新增按钮（推荐 5 步）
+  1. 在 `ToolbarButtonType` 添加新枚举，文案/tooltip一并确定。
+  2. 在 `toolbar_new` 中设置 `rect/tooltip/enabled`；若暂不显示，可先 `enabled=false` 且 `rect=0`。
+  3. 在 `draw_toolbar_button` 的 `switch(type)` 中绘制简笔图标（与现有风格一致）。
+  4. 在 `execute_button_action` 添加对应行为；如需外部可调用，增加一个对外 API 代理到内部行为。
+  5. 在 `toolbar_update_button_states` 集中管理启用条件（便于统一测试）。
+
+- 交互新增（如新输入框）
+  - 复用“互斥激活”模式（参考搜索/地址栏），在激活时 `SDL_StartTextInput`，停止时 `SDL_StopTextInput`；
+  - 绘制：背景/边框/文本/光标的顺序与现有输入框一致。
+
+- 布局变更
+  - 地址栏宽度取中部可用空间并裁剪到 [140,320]；
+  - 搜索框宽固定 220，搜索按钮位置在 `toolbar_draw` 内根据搜索框位置同步，不要在初始化时写死。
+
+- 历史策略
+  - 新路径写入前截断“前进分支”，容量不够翻倍扩容；
+  - 外部导航后务必调用 `toolbar_notify_directory_changed`，保证后退/前进状态及时更新。
+
+---
+
+## 代码详解（带源码定位）
+
+- 数据结构与按钮绘制
+```72:152:FileScope/app/ui/toolbar.c
+static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
+    // 根据 enabled/hovered/pressed 切换颜色 → 绘制背景与边框
+    // switch(button->type) 绘制图标（箭头、网格、放大镜、房屋、圆形刷新等）
+}
 ```
 
-#### Toolbar 主结构体
-```c
-typedef struct Toolbar {
-    struct Window *app;        // 应用程序窗口引用
-    SDL_Rect rect;             // 工具栏区域
-    ToolbarButton buttons[BUTTON_COUNT];  // 按钮数组
-    int button_count;          // 按钮数量
-    
-    // 历史记录管理
-    char **history;            // 历史路径数组
-    int history_capacity;      // 历史记录容量
-    int history_count;         // 历史记录数量
-    int history_index;         // 当前历史记录索引
-
-    // 搜索功能
-    char search_text[256];     // 搜索输入内容
-    bool search_active;        // 是否处于搜索输入状态
-    int search_cursor_pos;     // 光标位置
-    
-    // 地址栏功能
-    char address_bar_text[1024];  // 地址栏输入内容
-    bool address_bar_active;      // 是否处于地址栏输入状态
-    int address_bar_cursor_pos;   // 地址栏光标位置
-    bool address_bar_editing;     // 是否正在编辑地址栏
-} Toolbar;
-```
-
-## 核心功能
-
-### 1. 工具栏生命周期管理
-
-#### 创建工具栏
-```c
-Toolbar* toolbar = toolbar_new(window);
-if (!toolbar) {
-    // 处理创建失败
+- 命中检测（按钮）
+```294:309:FileScope/app/ui/toolbar.c
+static ToolbarButton*  find_button_at_point(Toolbar *toolbar, int x, int y) {
+    for (int i = 0; i < toolbar->button_count; i++) {
+        ToolbarButton *button = &toolbar->buttons[i];
+        if (x >= button->rect.x && x < button->rect.x + button->rect.w &&
+            y >= button->rect.y && y < button->rect.y + button->rect.h) {
+            return button;
+        }
+    }
     return NULL;
 }
 ```
 
-#### 释放工具栏
+- 历史写入与导航
+```311:350:FileScope/app/ui/toolbar.c
+static void add_to_history(Toolbar *toolbar, const char *path) {
+    // 截断前进分支 → 扩容（2x） → strdup(path) → count/index 推进 → 更新后退/前进可用性
+}
+```
+```352:385:FileScope/app/ui/toolbar.c
+static void navigate_back(Toolbar *toolbar) {
+    // history_index-- → 取路径 → file_list_view_load_directory(...)
+}
+static void navigate_forward(Toolbar *toolbar) {
+    // history_index++ → 取路径 → file_list_view_load_directory(...)
+}
+```
+
+- 刷新与行为分发
+```458:520:FileScope/app/ui/toolbar.c
+static void refresh_view(Toolbar *toolbar) { /* 以当前路径重载 */ }
+static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
+    // BACK/FORWARD/UP/HOME/REFRESH/SEARCH/VIEW 的行为切换
+}
+```
+
+- 生命周期与初始化（布局逻辑）
+```522:661:FileScope/app/ui/toolbar.c
+Toolbar* toolbar_new(struct Window *app) {
+    // 设置 rect → 左侧按钮布局（UP/HOME禁用且rect=0）→ 右侧搜索按钮+框 → 中部地址栏
+    // 初始化历史数组与搜索/地址栏状态
+}
+```
+
+- 事件分发（互斥激活 + 按钮按压）
+```683:868:FileScope/app/ui/toolbar.c
+bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) {
+    // 鼠标移动：hover 切换；
+    // 鼠标按下：命中地址栏/搜索框/按钮；地址栏与搜索互斥；搜索框内处理清除按钮；
+    // 鼠标抬起：若仍在按钮上则执行 execute_button_action；
+    // 键盘与文本：将输入路由到 search 或 address。
+}
+```
+
+- 绘制流水线（背景→按钮→地址栏→搜索框）
+```879:1074:FileScope/app/ui/toolbar.c
+void toolbar_draw(Toolbar *toolbar) {
+    // 背景/边框 → 逐个按钮 → 地址栏（文本/光标/占位）→ 搜索框（文本/光标/清除按钮）
+    // 搜索按钮位置在此与搜索框联动同步
+}
+```
+
+- 搜索/地址栏交互
+```1076:1209:FileScope/app/ui/toolbar.c
+// 搜索：start/stop/handle_text/handle_key/search（实时过滤与Ctrl+L清空）
+```
+```1210:1285:FileScope/app/ui/toolbar.c
+// 地址栏：start/stop/handle_text/handle_key/navigate（回车导航并入栈）
+```
+
+---
+
+## 粘贴修复片段（误删后的最小可用实现）
+- 适用场景：实现中某段被误删/破坏，优先用下列片段恢复（均与当前代码风格/接口对齐）。
+
+- 历史写入（替换/补回）
 ```c
-toolbar_free(toolbar);
-toolbar = NULL;
-```
-
-### 2. 按钮操作
-
-#### 设置按钮状态
-```c
-// 启用/禁用特定按钮
-toolbar_set_button_enabled(toolbar, BUTTON_BACK, true);
-toolbar_set_button_enabled(toolbar, BUTTON_FORWARD, false);
-
-// 更新所有按钮状态
-toolbar_update_button_states(toolbar);
-```
-
-#### 执行按钮操作
-```c
-// 后退操作
-bool success = toolbar_go_back(toolbar);
-
-// 前进操作
-success = toolbar_go_forward(toolbar);
-
-// 上一级操作
-success = toolbar_go_up(toolbar);
-
-// 返回主目录
-success = toolbar_go_home(toolbar);
-
-// 刷新视图
-success = toolbar_refresh(toolbar);
-
-// 切换视图模式
-success = toolbar_toggle_view(toolbar);
-
-// 执行搜索
-success = toolbar_search(toolbar, "search_term");
-```
-
-### 3. 历史记录管理
-
-#### 通知目录变更
-```c
-// 当用户导航到新目录时调用
-toolbar_notify_directory_changed(toolbar, "/new/path");
-```
-
-#### 历史导航
-```c
-// 检查是否可以后退
-if (toolbar->history_index > 0) {
-    // 可以后退
-}
-
-// 检查是否可以前进
-if (toolbar->history_index < toolbar->history_count - 1) {
-    // 可以前进
-}
-```
-
-### 4. 搜索功能
-
-#### 激活搜索
-```c
-// 开始搜索输入
-toolbar_search_start(toolbar);
-
-// 停止搜索
-toolbar_search_stop(toolbar);
-```
-
-#### 处理搜索输入
-```c
-// 处理文本输入
-toolbar_search_handle_text(toolbar, "search_text");
-
-// 处理键盘输入
-toolbar_search_handle_key(toolbar, SDL_SCANCODE_BACKSPACE);
-```
-
-### 5. 地址栏功能
-
-#### 地址栏操作
-```c
-// 激活地址栏
-toolbar_address_bar_start(toolbar);
-
-// 停止地址栏
-toolbar_address_bar_stop(toolbar);
-
-// 处理地址栏文本输入
-toolbar_address_bar_handle_text(toolbar, "new_path");
-
-// 处理地址栏键盘输入
-toolbar_address_bar_handle_key(toolbar, SDL_SCANCODE_RETURN);
-
-// 导航到指定路径
-toolbar_address_bar_navigate(toolbar, "/target/path");
-```
-
-### 6. 事件处理
-
-#### 处理SDL事件
-```c
-SDL_Event event;
-// ... 获取事件 ...
-
-bool handled = toolbar_handle_event(toolbar, &event);
-if (handled) {
-    // 事件已被工具栏处理
-}
-```
-
-#### 绘制工具栏
-```c
-// 在渲染循环中调用
-toolbar_draw(toolbar);
-```
-
-## 使用实例
-
-### 实例1：基本工具栏集成
-
-**目标**: 创建一个基本的工具栏应用程序，展示工具栏的核心功能
-
-**文件位置**: `examples/basic_toolbar.c`
-
-```c
-#include "toolbar.h"
-#include "main_window.h"
-#include <stdio.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
-
-int main() {
-    // 步骤1: 初始化SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL初始化失败: %s\n", SDL_GetError());
-        return -1;
+static void add_to_history(Toolbar *toolbar, const char *path) {
+    if (!toolbar || !path) return;
+    for (int i = toolbar->history_index + 1; i < toolbar->history_count; i++) {
+        free(toolbar->history[i]);
+        toolbar->history[i] = NULL;
     }
-    
-    // 步骤2: 创建主窗口
-    Window *window = window_new("FileScope - 工具栏示例", 800, 600);
-    if (!window) {
-        fprintf(stderr, "窗口创建失败\n");
-        SDL_Quit();
-        return -1;
+    toolbar->history_count = toolbar->history_index + 1;
+    if (toolbar->history_count >= toolbar->history_capacity) {
+        int new_capacity = toolbar->history_capacity * 2;
+        char **new_history = (char**)realloc(toolbar->history, new_capacity * sizeof(char*));
+        if (!new_history) return;
+        toolbar->history = new_history;
+        toolbar->history_capacity = new_capacity;
     }
-    
-    // 步骤3: 创建工具栏
-    Toolbar *toolbar = toolbar_new(window);
-    if (!toolbar) {
-        fprintf(stderr, "工具栏创建失败\n");
-        window_free(window);
-        SDL_Quit();
-        return -1;
-    }
-    
-    printf("工具栏创建成功，按钮数量: %d\n", toolbar->button_count);
-    
-    // 步骤4: 设置初始按钮状态
-    toolbar_update_button_states(toolbar);
-    
-    // 步骤5: 主事件循环
-    SDL_Event event;
-    bool running = true;
-    
-    while (running) {
-        // 处理事件
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-                case SDL_EVENT_QUIT:
-                    running = false;
-                    break;
-                    
-                case SDL_EVENT_KEYDOWN:
-                    // 处理键盘快捷键
-                    if (event.key.keysym.sym == SDLK_F5) {
-                        printf("手动刷新工具栏状态\n");
-                        toolbar_update_button_states(toolbar);
-                    } else if (event.key.keysym.sym == SDLK_F1) {
-                        printf("显示工具栏信息\n");
-                        printf("工具栏位置: (%d, %d, %d, %d)\n", 
-                               toolbar->rect.x, toolbar->rect.y, 
-                               toolbar->rect.w, toolbar->rect.h);
-                        printf("历史记录数量: %d\n", toolbar->history_count);
-                    }
-                    break;
-                    
-                case SDL_EVENT_MOUSEBUTTONDOWN:
-                    // 显示鼠标点击信息
-                    printf("鼠标点击: (%d, %d)\n", event.button.x, event.button.y);
-                    break;
-                    
-                default:
-                    // 处理工具栏事件
-                    bool handled = toolbar_handle_event(toolbar, &event);
-                    if (handled) {
-                        printf("工具栏处理了事件类型: %d\n", event.type);
-                    }
-                    break;
-            }
-        }
-        
-        // 步骤6: 渲染循环
-        SDL_SetRenderDrawColor(window->renderer, 255, 255, 255, 255);
-        SDL_RenderClear(window->renderer);
-        
-        // 绘制工具栏
-        toolbar_draw(toolbar);
-        
-        // 更新显示
-        SDL_RenderPresent(window->renderer);
-        
-        // 控制帧率
-        SDL_Delay(16); // 约60FPS
-    }
-    
-    // 步骤7: 清理资源
-    printf("正在清理资源...\n");
-    toolbar_free(toolbar);
-    window_free(window);
-    SDL_Quit();
-    
-    printf("程序正常退出\n");
-    return 0;
-}
-```
-
-**编译和运行**:
-```bash
-# 创建示例目录
-mkdir examples && cd examples
-
-# 创建Makefile
-cat > Makefile << 'EOF'
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c99
-LDFLAGS = -lSDL2
-INCLUDES = -I../include
-SOURCES = basic_toolbar.c ../src/toolbar.c ../src/window.c
-TARGET = basic_toolbar
-
-$(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) $(INCLUDES) $(SOURCES) -o $(TARGET) $(LDFLAGS)
-
-clean:
-	rm -f $(TARGET)
-EOF
-
-# 编译
-make
-
-# 运行
-./basic_toolbar
-```
-
-**功能说明**:
-- 创建基本的工具栏应用程序
-- 支持鼠标和键盘事件处理
-- 提供调试信息和状态显示
-- 实现完整的资源管理
-- 支持F5刷新和F1信息显示快捷键
-
-**关键点**:
-- SDL初始化和清理
-- 窗口和工具栏的创建顺序
-- 事件循环的处理流程
-- 渲染循环的实现
-- 资源的正确释放顺序
-
-### 实例2：自定义按钮操作
-
-**目标**: 为工具栏按钮添加自定义操作逻辑，实现特定的业务功能
-
-**文件位置**: `examples/custom_button_actions.c`
-
-```c
-#include "toolbar.h"
-#include "main_window.h"
-#include <stdio.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
-
-// 自定义按钮操作回调函数
-void custom_button_action(Toolbar *toolbar, ToolbarButtonType button_type) {
-    if (!toolbar) return;
-    
-    switch (button_type) {
-        case BUTTON_REFRESH:
-            printf("执行自定义刷新操作\n");
-            custom_refresh_operation(toolbar);
-            break;
-            
-        case BUTTON_VIEW:
-            printf("执行自定义视图切换\n");
-            custom_view_toggle(toolbar);
-            break;
-            
-        case BUTTON_SEARCH:
-            printf("执行自定义搜索操作\n");
-            custom_search_operation(toolbar);
-            break;
-            
-        case BUTTON_HOME:
-            printf("执行自定义主目录操作\n");
-            custom_home_operation(toolbar);
-            break;
-            
-        default:
-            // 其他按钮使用默认操作
-            break;
-    }
-}
-
-// 自定义刷新操作实现
-void custom_refresh_operation(Toolbar *toolbar) {
-    printf("正在执行自定义刷新...\n");
-    
-    // 1. 显示刷新进度指示器
-    printf("显示刷新进度指示器\n");
-    
-    // 2. 执行自定义刷新逻辑
-    // 例如：重新扫描目录、更新文件列表、清除缓存等
-    printf("重新扫描目录内容\n");
-    printf("更新文件列表视图\n");
-    printf("清除缓存数据\n");
-    
-    // 3. 延迟模拟刷新过程
-    SDL_Delay(1000);
-    
-    // 4. 隐藏刷新指示器
-    printf("隐藏刷新进度指示器\n");
-    
-    // 5. 通知主窗口更新
-    if (toolbar->app && toolbar->app->user_data) {
-        MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-        printf("通知主窗口刷新完成\n");
-        // 调用主窗口的刷新方法
-        // main_window_refresh(main_window);
-    }
-    
-    printf("自定义刷新完成\n");
-}
-
-// 自定义视图切换实现
-void custom_view_toggle(Toolbar *toolbar) {
-    static int current_view_mode = 0;
-    const char *view_modes[] = {"列表视图", "图标视图", "详细信息视图", "缩略图视图"};
-    
-    // 循环切换视图模式
-    current_view_mode = (current_view_mode + 1) % 4;
-    
-    printf("切换到视图模式: %s\n", view_modes[current_view_mode]);
-    
-    // 更新工具栏按钮状态
-    toolbar_update_button_states(toolbar);
-    
-    // 通知主窗口切换视图
-    if (toolbar->app && toolbar->app->user_data) {
-        MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-        printf("通知主窗口切换视图模式: %d\n", current_view_mode);
-        // 调用主窗口的视图切换方法
-        // main_window_set_view_mode(main_window, current_view_mode);
-    }
-}
-
-// 自定义搜索操作实现
-void custom_search_operation(Toolbar *toolbar) {
-    printf("激活自定义搜索功能\n");
-    
-    // 1. 启动搜索模式
-    toolbar_search_start(toolbar);
-    
-    // 2. 显示搜索选项
-    printf("搜索选项:\n");
-    printf("1. 按文件名搜索\n");
-    printf("2. 按文件内容搜索\n");
-    printf("3. 按文件大小搜索\n");
-    printf("4. 按修改日期搜索\n");
-    
-    // 3. 设置搜索过滤器
-    printf("设置默认搜索过滤器: *.txt, *.doc, *.pdf\n");
-}
-
-// 自定义主目录操作实现
-void custom_home_operation(Toolbar *toolbar) {
-    printf("执行自定义主目录操作\n");
-    
-    // 1. 获取用户主目录
-    const char *home_path = getenv("HOME");
-    if (!home_path) {
-        home_path = getenv("USERPROFILE"); // Windows支持
-    }
-    
-    if (home_path) {
-        printf("用户主目录: %s\n", home_path);
-        
-        // 2. 导航到主目录
-        printf("导航到主目录\n");
-        
-        // 3. 更新地址栏
-        strncpy(toolbar->address_bar_text, home_path, sizeof(toolbar->address_bar_text) - 1);
-        toolbar->address_bar_text[sizeof(toolbar->address_bar_text) - 1] = '\0';
-        
-        // 4. 添加到历史记录
-        toolbar_notify_directory_changed(toolbar, home_path);
-        
-        printf("已导航到主目录\n");
-    } else {
-        printf("无法获取用户主目录\n");
-    }
-}
-
-// 集成到工具栏事件处理
-void integrate_custom_actions(Toolbar *toolbar) {
-    if (!toolbar) return;
-    
-    printf("集成自定义按钮操作到工具栏\n");
-    
-    // 设置自定义操作标志
-    toolbar->custom_actions_enabled = true;
-    
-    // 注册自定义操作回调
-    toolbar->custom_action_callback = custom_button_action;
-    
-    printf("自定义按钮操作集成完成\n");
-}
-
-// 主函数
-int main() {
-    // 初始化SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL初始化失败: %s\n", SDL_GetError());
-        return -1;
-    }
-    
-    // 创建主窗口
-    Window *window = window_new("自定义按钮操作示例", 800, 600);
-    if (!window) {
-        fprintf(stderr, "窗口创建失败\n");
-        SDL_Quit();
-        return -1;
-    }
-    
-    // 创建工具栏
-    Toolbar *toolbar = toolbar_new(window);
-    if (!toolbar) {
-        fprintf(stderr, "工具栏创建失败\n");
-        window_free(window);
-        SDL_Quit();
-        return -1;
-    }
-    
-    // 集成自定义操作
-    integrate_custom_actions(toolbar);
-    
-    // 主事件循环
-    SDL_Event event;
-    bool running = true;
-    
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            
-            // 处理工具栏事件
-            toolbar_handle_event(toolbar, &event);
-        }
-        
-        // 渲染
-        SDL_SetRenderDrawColor(window->renderer, 255, 255, 255, 255);
-        SDL_RenderClear(window->renderer);
-        toolbar_draw(toolbar);
-        SDL_RenderPresent(window->renderer);
-        
-        SDL_Delay(16);
-    }
-    
-    // 清理
-    toolbar_free(toolbar);
-    window_free(window);
-    SDL_Quit();
-    
-    return 0;
-}
-```
-
-**编译和运行**:
-```bash
-# 编译
-gcc -Wall -Wextra -std=c99 -I../include custom_button_actions.c ../src/toolbar.c ../src/window.c -o custom_button_actions -lSDL2
-
-# 运行
-./custom_button_actions
-```
-
-**功能说明**:
-- 为不同按钮类型实现自定义操作
-- 支持刷新、视图切换、搜索、主目录等自定义功能
-- 提供详细的调试输出和状态信息
-- 实现与主窗口的集成通信
-
-**关键点**:
-- 自定义操作回调函数的注册
-- 按钮操作的具体实现逻辑
-- 与主窗口的通信机制
-- 状态更新和界面刷新
-
-### 实例3：扩展工具栏功能
-
-**目标**: 为工具栏添加新的按钮类型和功能，扩展工具栏的能力
-
-**文件位置**: `examples/extended_toolbar.c`
-
-#### 3.1 扩展按钮类型
-
-```c
-// 扩展的按钮类型枚举
-typedef enum {
-    BUTTON_BACK,        // 后退按钮
-    BUTTON_FORWARD,     // 前进按钮
-    BUTTON_UP,          // 上一级按钮
-    BUTTON_HOME,        // 主目录按钮
-    BUTTON_REFRESH,     // 刷新按钮
-    BUTTON_SEARCH,      // 搜索按钮
-    BUTTON_VIEW,        // 视图切换按钮
-    BUTTON_COPY,        // 新增复制按钮
-    BUTTON_PASTE,       // 新增粘贴按钮
-    BUTTON_DELETE,      // 新增删除按钮
-    BUTTON_CUT,         // 新增剪切按钮
-    BUTTON_SELECT_ALL,  // 新增全选按钮
-    BUTTON_COUNT        // 按钮总数
-} ToolbarButtonType;
-```
-
-#### 3.2 扩展工具栏结构体
-
-```c
-typedef struct Toolbar {
-    struct Window *app;        // 应用程序窗口引用
-    SDL_Rect rect;             // 工具栏区域
-    ToolbarButton buttons[BUTTON_COUNT];  // 按钮数组
-    int button_count;          // 按钮数量
-    
-    // 原有功能字段...
-    
-    // 新增功能字段
-    bool has_selection;        // 是否有选中的文件/文件夹
-    bool clipboard_has_data;   // 剪贴板是否有数据
-    char clipboard_path[1024]; // 剪贴板中的路径
-    int selected_count;        // 选中的项目数量
-} Toolbar;
-```
-
-#### 3.3 初始化新按钮
-
-```c
-// 初始化复制按钮
-void init_copy_button(Toolbar *toolbar, int *button_x) {
-    toolbar->buttons[BUTTON_COPY].type = BUTTON_COPY;
-    toolbar->buttons[BUTTON_COPY].rect.x = *button_x;
-    toolbar->buttons[BUTTON_COPY].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
-    toolbar->buttons[BUTTON_COPY].rect.w = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_COPY].rect.h = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_COPY].tooltip = "复制 (Ctrl+C)";
-    toolbar->buttons[BUTTON_COPY].enabled = false; // 初始状态禁用
-    
-    *button_x += BUTTON_SIZE + BUTTON_SPACING;
-}
-
-// 初始化粘贴按钮
-void init_paste_button(Toolbar *toolbar, int *button_x) {
-    toolbar->buttons[BUTTON_PASTE].type = BUTTON_PASTE;
-    toolbar->buttons[BUTTON_PASTE].rect.x = *button_x;
-    toolbar->buttons[BUTTON_PASTE].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
-    toolbar->buttons[BUTTON_PASTE].rect.w = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_PASTE].rect.h = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_PASTE].tooltip = "粘贴 (Ctrl+V)";
-    toolbar->buttons[BUTTON_PASTE].enabled = false; // 初始状态禁用
-    
-    *button_x += BUTTON_SIZE + BUTTON_SPACING;
-}
-
-// 初始化删除按钮
-void init_delete_button(Toolbar *toolbar, int *button_x) {
-    toolbar->buttons[BUTTON_DELETE].type = BUTTON_DELETE;
-    toolbar->buttons[BUTTON_DELETE].rect.x = *button_x;
-    toolbar->buttons[BUTTON_DELETE].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
-    toolbar->buttons[BUTTON_DELETE].rect.w = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_DELETE].rect.h = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_DELETE].tooltip = "删除 (Del)";
-    toolbar->buttons[BUTTON_DELETE].enabled = false; // 初始状态禁用
-    
-    *button_x += BUTTON_SIZE + BUTTON_SPACING;
-}
-```
-
-#### 3.4 添加按钮绘制逻辑
-
-```c
-// 绘制复制图标
-void draw_copy_icon(SDL_Renderer *renderer, int x, int y, int size) {
-    SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
-    
-    // 绘制两个重叠的矩形表示复制
-    SDL_Rect rect1 = {x + size/4, y + size/4, size/2, size/2};
-    SDL_Rect rect2 = {x + size/2, y + size/2, size/2, size/2};
-    
-    SDL_RenderFillRect(renderer, &rect1);
-    SDL_RenderFillRect(renderer, &rect2);
-    
-    // 绘制边框
-    SDL_RenderDrawRect(renderer, &rect1);
-    SDL_RenderDrawRect(renderer, &rect2);
-}
-
-// 绘制粘贴图标
-void draw_paste_icon(SDL_Renderer *renderer, int x, int y, int size) {
-    SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
-    
-    // 绘制剪贴板图标
-    SDL_Rect rect = {x + size/4, y + size/6, size/2, size*2/3};
-    SDL_RenderFillRect(renderer, &rect);
-    
-    // 绘制顶部夹子
-    SDL_Rect clip = {x + size/3, y + size/6, size/3, size/6};
-    SDL_RenderFillRect(renderer, &clip);
-}
-
-// 绘制删除图标
-void draw_delete_icon(SDL_Renderer *renderer, int x, int y, int size) {
-    SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
-    
-    // 绘制垃圾桶图标
-    SDL_Rect rect = {x + size/4, y + size/3, size/2, size/2};
-    SDL_RenderFillRect(renderer, &rect);
-    
-    // 绘制垃圾桶盖子
-    SDL_Rect lid = {x + size/6, y + size/4, size*2/3, size/6};
-    SDL_RenderFillRect(renderer, &lid);
-}
-```
-
-#### 3.5 实现按钮操作逻辑
-
-```c
-// 执行复制操作
-void execute_copy_operation(Toolbar *toolbar) {
-    if (!toolbar->has_selection) {
-        printf("没有选中的项目，无法复制\n");
-        return;
-    }
-    
-    printf("执行复制操作，选中项目数量: %d\n", toolbar->selected_count);
-    
-    // 1. 获取选中的文件列表
-    // 2. 将文件信息复制到剪贴板
-    // 3. 设置剪贴板状态
-    toolbar->clipboard_has_data = true;
-    strcpy(toolbar->clipboard_path, "复制到剪贴板");
-    
-    // 4. 通知主窗口更新
-    if (toolbar->app && toolbar->app->user_data) {
-        MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-        printf("通知主窗口执行复制操作\n");
-        // 调用主窗口的复制方法
-        // main_window_copy_files(main_window);
-    }
-    
-    printf("复制操作完成\n");
-}
-
-// 执行粘贴操作
-void execute_paste_operation(Toolbar *toolbar) {
-    if (!toolbar->clipboard_has_data) {
-        printf("剪贴板中没有数据，无法粘贴\n");
-        return;
-    }
-    
-    printf("执行粘贴操作\n");
-    
-    // 1. 获取剪贴板中的文件信息
-    // 2. 在当前目录中粘贴文件
-    // 3. 更新文件列表
-    
-    // 4. 通知主窗口更新
-    if (toolbar->app && toolbar->app->user_data) {
-        MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-        printf("通知主窗口执行粘贴操作\n");
-        // 调用主窗口的粘贴方法
-        // main_window_paste_files(main_window);
-    }
-    
-    printf("粘贴操作完成\n");
-}
-
-// 执行删除操作
-void execute_delete_operation(Toolbar *toolbar) {
-    if (!toolbar->has_selection) {
-        printf("没有选中的项目，无法删除\n");
-        return;
-    }
-    
-    printf("执行删除操作，选中项目数量: %d\n", toolbar->selected_count);
-    
-    // 1. 显示删除确认对话框
-    printf("显示删除确认对话框\n");
-    
-    // 2. 删除选中的文件/文件夹
-    // 3. 更新文件列表
-    
-    // 4. 通知主窗口更新
-    if (toolbar->app && toolbar->app->user_data) {
-        MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-        printf("通知主窗口执行删除操作\n");
-        // 调用主窗口的删除方法
-        // main_window_delete_files(main_window);
-    }
-    
-    printf("删除操作完成\n");
-}
-```
-
-#### 3.6 更新按钮状态管理
-
-```c
-// 更新按钮状态管理函数
-void toolbar_update_button_states(Toolbar *toolbar) {
-    if (!toolbar) return;
-    
-    // 更新原有按钮状态
+    toolbar->history[toolbar->history_count] = strdup(path);
+    if (!toolbar->history[toolbar->history_count]) return;
+    toolbar->history_count++;
+    toolbar->history_index = toolbar->history_count - 1;
     toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);
     toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1);
-    toolbar->buttons[BUTTON_UP].enabled = true;
-    toolbar->buttons[BUTTON_HOME].enabled = true;
-    toolbar->buttons[BUTTON_REFRESH].enabled = true;
-    toolbar->buttons[BUTTON_SEARCH].enabled = true;
-    toolbar->buttons[BUTTON_VIEW].enabled = true;
-    
-    // 更新新增按钮状态
-    toolbar->buttons[BUTTON_COPY].enabled = toolbar->has_selection;
-    toolbar->buttons[BUTTON_PASTE].enabled = toolbar->clipboard_has_data;
-    toolbar->buttons[BUTTON_DELETE].enabled = toolbar->has_selection;
-    toolbar->buttons[BUTTON_CUT].enabled = toolbar->has_selection;
-    toolbar->buttons[BUTTON_SELECT_ALL].enabled = true;
 }
 ```
 
-#### 3.7 完整的扩展示例
-
+- 导航（后退/前进）
 ```c
-#include "toolbar.h"
-#include "main_window.h"
-#include <stdio.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
+static void navigate_back(Toolbar *toolbar) {
+    if (!toolbar || toolbar->history_index <= 0 || !toolbar->app || !toolbar->app->user_data) return;
+    toolbar->history_index--;
+    const char *path = toolbar->history[toolbar->history_index];
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
+    file_list_view_load_directory(main_window->file_list_view, path);
+    toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);
+    toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1);
+}
 
-int main() {
-    // 初始化SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL初始化失败: %s\n", SDL_GetError());
-        return -1;
-    }
-    
-    // 创建主窗口
-    Window *window = window_new("扩展工具栏示例", 1000, 600);
-    if (!window) {
-        fprintf(stderr, "窗口创建失败\n");
-        SDL_Quit();
-        return -1;
-    }
-    
-    // 创建工具栏
-    Toolbar *toolbar = toolbar_new(window);
-    if (!toolbar) {
-        fprintf(stderr, "工具栏创建失败\n");
-        window_free(window);
-        SDL_Quit();
-        return -1;
-    }
-    
-    printf("扩展工具栏创建成功，按钮数量: %d\n", toolbar->button_count);
-    
-    // 模拟文件选择状态
-    toolbar->has_selection = true;
-    toolbar->selected_count = 3;
-    toolbar->clipboard_has_data = true;
-    
-    // 更新按钮状态
-    toolbar_update_button_states(toolbar);
-    
-    // 主事件循环
-    SDL_Event event;
-    bool running = true;
-    
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            
-            // 处理工具栏事件
-            toolbar_handle_event(toolbar, &event);
-        }
-        
-        // 渲染
-        SDL_SetRenderDrawColor(window->renderer, 255, 255, 255, 255);
-        SDL_RenderClear(window->renderer);
-        toolbar_draw(toolbar);
-        SDL_RenderPresent(window->renderer);
-        
-        SDL_Delay(16);
-    }
-    
-    // 清理
-    toolbar_free(toolbar);
-    window_free(window);
-    SDL_Quit();
-    
-    return 0;
+static void navigate_forward(Toolbar *toolbar) {
+    if (!toolbar || toolbar->history_index >= toolbar->history_count - 1 || !toolbar->app || !toolbar->app->user_data) return;
+    toolbar->history_index++;
+    const char *path = toolbar->history[toolbar->history_index];
+    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
+    file_list_view_load_directory(main_window->file_list_view, path);
+    toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);
+    toolbar->buttons[BUTTON_FORWARD].enabled = (toolbar->history_index < toolbar->history_count - 1);
 }
 ```
 
-**编译和运行**:
-```bash
-# 编译
-gcc -Wall -Wextra -std=c99 -I../include extended_toolbar.c ../src/toolbar.c ../src/window.c -o extended_toolbar -lSDL2
-
-# 运行
-./extended_toolbar
-```
-
-**功能说明**:
-- 添加了复制、粘贴、删除、剪切、全选等新按钮
-- 实现了新按钮的图标绘制和操作逻辑
-- 提供了完整的按钮状态管理
-- 支持剪贴板操作和文件选择状态
-
-**关键点**:
-- 新按钮的完整添加流程
-- 按钮状态的条件管理
-- 图标绘制的实现方法
-- 操作逻辑的集成方式
-
-### 实例4：高级历史记录管理
-
-**目标**: 实现高级历史记录功能，包括历史记录清理、搜索和智能导航
-
-**文件位置**: `examples/advanced_history.c`
-
+- 刷新与行为分发（最简版）
 ```c
-#include "toolbar.h"
-#include "main_window.h"
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include <SDL2/SDL.h>
-
-// 高级历史记录管理
-void advanced_history_management(Toolbar *toolbar) {
-    if (!toolbar) return;
-    
-    printf("开始高级历史记录管理...\n");
-    
-    // 1. 限制历史记录数量，防止内存过度使用
-    if (toolbar->history_count > 50) {
-        printf("历史记录数量超过限制，正在清理...\n");
-        
-        int items_to_remove = toolbar->history_count - 50;
-        for (int i = 0; i < items_to_remove; i++) {
-            free(toolbar->history[0]);
-            memmove(&toolbar->history[0], &toolbar->history[1], 
-                    (toolbar->history_count - 1) * sizeof(char*));
-            toolbar->history_count--;
-            toolbar->history_index--;
-        }
-        
-        printf("已清理 %d 条历史记录，当前数量: %d\n", 
-               items_to_remove, toolbar->history_count);
-    }
-    
-    // 2. 去重处理，避免重复的历史记录
-    remove_duplicate_history(toolbar);
-    
-    // 3. 更新按钮状态
-    toolbar_update_button_states(toolbar);
-    
-    printf("高级历史记录管理完成\n");
+static void refresh_view(Toolbar *toolbar) {
+    if (!toolbar || !toolbar->app || !toolbar->app->user_data) return;
+    MainWindow *mw = (MainWindow*)toolbar->app->user_data;
+    if (!mw || !mw->file_list_view || !mw->file_list_view->current_path) return;
+    file_list_view_load_directory(mw->file_list_view, mw->file_list_view->current_path);
 }
 
-// 移除重复的历史记录
-void remove_duplicate_history(Toolbar *toolbar) {
-    if (!toolbar || toolbar->history_count <= 1) return;
+static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
+    if (!toolbar || !button || !button->enabled) return;
+    switch (button->type) {
+        case BUTTON_BACK:    navigate_back(toolbar); break;
+        case BUTTON_FORWARD: navigate_forward(toolbar); break;
+        case BUTTON_UP:      /* 可选 */ break;
+        case BUTTON_HOME:    /* 可选 */ break;
+        case BUTTON_REFRESH: refresh_view(toolbar); break;
+        case BUTTON_SEARCH:  toolbar_search_start(toolbar); break;
+        case BUTTON_VIEW: {
+            MainWindow *mw = (MainWindow*)toolbar->app->user_data;
+            if (mw && mw->file_list_view) file_list_view_toggle_mode(mw->file_list_view);
+        } break;
+        default: break;
+    }
+}
+```
+
+- 绘制主流程（骨架）
+```c
+void toolbar_draw(Toolbar *toolbar) {
+    if (!toolbar || !toolbar->app || !toolbar->app->renderer) return;
+    SDL_Renderer *renderer = toolbar->app->renderer;
+    // 背景与边框
+    SDL_SetRenderDrawColor(renderer, 240,240,240,255);
+    SDL_FRect t = {(float)toolbar->rect.x,(float)toolbar->rect.y,(float)toolbar->rect.w,(float)toolbar->rect.h};
+    SDL_RenderFillRect(renderer, &t);
+    SDL_SetRenderDrawColor(renderer, 100,100,100,255);
+    SDL_RenderRect(renderer, &t);
+    // 按钮
+    for (int i = 0; i < toolbar->button_count; i++) draw_toolbar_button(toolbar, &toolbar->buttons[i]);
+    // 计算区域：地址栏（中）+ 搜索（右）
+    int search_w=220, sh=BUTTON_SIZE;
+    int sx = toolbar->rect.x + toolbar->rect.w - search_w - BUTTON_PADDING;
+    int sy = toolbar->rect.y + (toolbar->rect.h - sh)/2;
+    toolbar->buttons[BUTTON_SEARCH].rect.x = sx - BUTTON_SPACING - BUTTON_SIZE;
+    toolbar->buttons[BUTTON_SEARCH].rect.y = sy;
+    toolbar->buttons[BUTTON_SEARCH].rect.w = BUTTON_SIZE;
+    toolbar->buttons[BUTTON_SEARCH].rect.h = BUTTON_SIZE;
+    int left_group_right = toolbar->buttons[BUTTON_VIEW].rect.x + toolbar->buttons[BUTTON_VIEW].rect.w;
+    int addr_left = left_group_right + BUTTON_SPACING;
+    int addr_right = toolbar->buttons[BUTTON_SEARCH].rect.x - BUTTON_SPACING;
+    int addr_w = addr_right - addr_left; if (addr_w > 320) addr_w=320; if (addr_w < 140) addr_w=140;
+    int addr_h = BUTTON_SIZE;
+    int addr_x = addr_left;
+    int addr_y = toolbar->rect.y + (toolbar->rect.h - addr_h)/2;
+    // 地址栏背景/边框/文本/光标
+    SDL_FRect address_box = { 
+        (float)address_box_x, (float)address_box_y, 
+        (float)address_box_w, (float)address_box_h 
+    };
     
-    int removed_count = 0;
+    // 地址栏背景与边框颜色选择
+    SDL_Color addr_bg = toolbar->address_bar_active ? 
+        (SDL_Color){255, 255, 240, 255} : (SDL_Color){255, 255, 255, 255};
+    SDL_Color addr_border = toolbar->address_bar_active ? 
+        (SDL_Color){0, 120, 215, 255} : (SDL_Color){100, 100, 100, 255};
     
-    for (int i = 0; i < toolbar->history_count - 1; i++) {
-        for (int j = i + 1; j < toolbar->history_count; j++) {
-            if (strcmp(toolbar->history[i], toolbar->history[j]) == 0) {
-                // 发现重复记录，删除后面的
-                free(toolbar->history[j]);
-                
-                // 移动后面的记录
-                for (int k = j; k < toolbar->history_count - 1; k++) {
-                    toolbar->history[k] = toolbar->history[k + 1];
-                }
-                
-                toolbar->history_count--;
-                removed_count++;
-                
-                // 调整当前索引
-                if (toolbar->history_index >= j) {
-                    toolbar->history_index--;
-                }
-                
-                j--; // 重新检查当前位置
+    // 绘制地址栏背景
+    SDL_SetRenderDrawColor(renderer, addr_bg.r, addr_bg.g, addr_bg.b, addr_bg.a);
+    SDL_RenderFillRect(renderer, &address_box);
+    
+    // 绘制地址栏边框
+    SDL_SetRenderDrawColor(renderer, addr_border.r, addr_border.g, addr_border.b, addr_border.a);
+    SDL_RenderRect(renderer, &address_box);
+    
+    // 地址栏文本渲染
+    SDL_Color addr_text_color = (SDL_Color){30, 30, 30, 255};
+    const char *addr_text_to_show = NULL;
+    
+    // 确定显示文本：优先显示用户输入，否则显示当前路径
+    if (toolbar->address_bar_active || toolbar->address_bar_text[0] != '\0') {
+        addr_text_to_show = toolbar->address_bar_text;
+    } else {
+        if (toolbar->app && toolbar->app->user_data) {
+            MainWindow *mw = (MainWindow*)toolbar->app->user_data;
+            if (mw && mw->file_list_view && mw->file_list_view->current_path) {
+                addr_text_to_show = mw->file_list_view->current_path;
             }
         }
     }
     
-    if (removed_count > 0) {
-        printf("已移除 %d 条重复的历史记录\n", removed_count);
-    }
-}
-
-// 历史记录搜索
-void search_history(Toolbar *toolbar, const char *search_term) {
-    if (!toolbar || !search_term) return;
-    
-    printf("搜索历史记录: %s\n", search_term);
-    
-    // 创建搜索结果数组
-    int *search_results = malloc(toolbar->history_count * sizeof(int));
-    int result_count = 0;
-    
-    if (!search_results) {
-        printf("内存分配失败，无法搜索历史记录\n");
-        return;
-    }
-    
-    // 执行搜索
-    for (int i = 0; i < toolbar->history_count; i++) {
-        if (strstr(toolbar->history[i], search_term) != NULL) {
-            search_results[result_count] = i;
-            result_count++;
+    // 渲染地址栏文本
+    if (addr_text_to_show && toolbar->app->font) {
+        size_t addr_len = strlen(addr_text_to_show);
+        SDL_Surface *addr_surface = TTF_RenderText_Blended(toolbar->app->font, addr_text_to_show, addr_len, addr_text_color);
+        if (addr_surface) {
+            SDL_Texture *addr_tex = SDL_CreateTextureFromSurface(renderer, addr_surface);
+            if (addr_tex) {
+                int text_x = address_box_x + 8;
+                SDL_FRect dst = { 
+                    (float)text_x, 
+                    (float)(address_box_y + (address_box_h - addr_surface->h) / 2),
+                    (float)addr_surface->w, 
+                    (float)addr_surface->h 
+                };
+                // 裁剪显示，避免超出
+                if (dst.w > address_box.w - 16) dst.w = address_box.w - 16;
+                SDL_RenderTexture(renderer, addr_tex, NULL, &dst);
+                SDL_DestroyTexture(addr_tex);
+            }
+            SDL_DestroySurface(addr_surface);
         }
     }
     
-    // 显示搜索结果
-    if (result_count > 0) {
-        printf("找到 %d 条匹配的历史记录:\n", result_count);
-        for (int i = 0; i < result_count; i++) {
-            int index = search_results[i];
-            printf("  [%d] %s\n", index, toolbar->history[index]);
+    // 绘制地址栏光标
+    if (toolbar->address_bar_active) {
+        int caret_x = address_box_x + 8;
+        if (toolbar->address_bar_text[0] != '\0' && toolbar->app->font) {
+            char temp_addr[1024];
+            int cp = toolbar->address_bar_cursor_pos;
+            if (cp < 0) cp = 0;
+            if (cp > (int)strlen(toolbar->address_bar_text)) cp = (int)strlen(toolbar->address_bar_text);
+            strncpy(temp_addr, toolbar->address_bar_text, cp);
+            temp_addr[cp] = '\0';
+            SDL_Surface *pre_surface = TTF_RenderText_Blended(toolbar->app->font, temp_addr, strlen(temp_addr), addr_text_color);
+            if (pre_surface) {
+                caret_x += pre_surface->w;
+                SDL_DestroySurface(pre_surface);
+            }
+        }
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderLine(renderer, caret_x, address_box_y + 4, caret_x, address_box_y + address_box_h - 4);
+    }
+    
+    // 搜索框背景/边框/文本/光标/清除按钮
+    SDL_FRect search_box = {
+        (float)search_box_x, (float)search_box_y, 
+        (float)search_box_w, (float)search_box_h
+    };
+    
+    // 搜索框背景与边框颜色选择
+    SDL_Color search_bg_color = toolbar->search_active ? 
+        (SDL_Color){255, 255, 240, 255} : (SDL_Color){255, 255, 255, 255};
+    SDL_Color search_border_color = toolbar->search_active ? 
+        (SDL_Color){0, 120, 215, 255} : (SDL_Color){100, 100, 100, 255};
+    
+    // 绘制搜索框背景
+    SDL_SetRenderDrawColor(renderer, search_bg_color.r, search_bg_color.g, search_bg_color.b, search_bg_color.a);
+    SDL_RenderFillRect(renderer, &search_box);
+    
+    // 绘制搜索框边框
+    SDL_SetRenderDrawColor(renderer, search_border_color.r, search_border_color.g, search_border_color.b, search_border_color.a);
+    SDL_RenderRect(renderer, &search_box);
+    
+    // 搜索框文本渲染
+    if (toolbar->search_active || toolbar->search_text[0] != '\0') {
+        SDL_Color text_color = {30, 30, 30, 255};
+        if (toolbar->app->font && toolbar->search_text[0] != '\0') {
+            size_t text_len = strlen(toolbar->search_text);
+            SDL_Surface *text_surface = TTF_RenderText_Blended(toolbar->app->font, toolbar->search_text, text_len, text_color);
+            if (text_surface) {
+                SDL_Texture *text_tex = SDL_CreateTextureFromSurface(renderer, text_surface);
+                if (text_tex) {
+                    SDL_FRect dst = {
+                        (float)(search_box_x + 8), 
+                        (float)(search_box_y + (search_box_h - text_surface->h) / 2),
+                        (float)text_surface->w, 
+                        (float)text_surface->h
+                    };
+                    SDL_RenderTexture(renderer, text_tex, NULL, &dst);
+                    SDL_DestroyTexture(text_tex);
+                }
+                SDL_DestroySurface(text_surface);
+            }
         }
         
-        // 提供选择导航的选项
-        if (result_count == 1) {
-            printf("自动导航到唯一匹配项\n");
-            navigate_to_history_index(toolbar, search_results[0]);
-        } else {
-            printf("请选择要导航的历史记录项 (0-%d): ", result_count - 1);
-            // 这里可以实现用户选择逻辑
+        // 绘制搜索框光标
+        if (toolbar->search_active) {
+            int cursor_x = search_box_x + 8;
+            if (toolbar->search_text[0] != '\0' && toolbar->app->font) {
+                char temp_text[256];
+                strncpy(temp_text, toolbar->search_text, toolbar->search_cursor_pos);
+                temp_text[toolbar->search_cursor_pos] = '\0';
+                
+                SDL_Surface *cursor_surface = TTF_RenderText_Blended(toolbar->app->font, temp_text, strlen(temp_text), text_color);
+                if (cursor_surface) {
+                    cursor_x += cursor_surface->w;
+                    SDL_DestroySurface(cursor_surface);
+                }
+            }
+            
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderLine(renderer, cursor_x, search_box_y + 4, cursor_x, search_box_y + search_box_h - 4);
+        }
+        
+        // 绘制清除搜索按钮（X）
+        if (toolbar->search_text[0] != '\0') {
+            int clear_button_size = 16;
+            int clear_button_x = search_box_x + search_box_w - clear_button_size - 4;
+            int clear_button_y = search_box_y + (search_box_h - clear_button_size) / 2;
+            
+            // 绘制清除按钮背景（圆形）
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            SDL_FRect clear_button = {
+                (float)clear_button_x, (float)clear_button_y, 
+                (float)clear_button_size, (float)clear_button_size
+            };
+            SDL_RenderFillRect(renderer, &clear_button);
+            
+            // 绘制X符号
+            SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+            SDL_RenderLine(renderer, 
+                          clear_button_x + 4, clear_button_y + 4, 
+                          clear_button_x + clear_button_size - 4, clear_button_y + clear_button_size - 4);
+            SDL_RenderLine(renderer, 
+                          clear_button_x + clear_button_size - 4, clear_button_y + 4, 
+                          clear_button_x + 4, clear_button_y + clear_button_size - 4);
         }
     } else {
-        printf("未找到匹配的历史记录\n");
+        // 显示搜索框占位符
+        SDL_Color ph_color = {180, 180, 180, 255};
+        if (toolbar->app->font) {
+            size_t ph_len = strlen("搜索...");
+            SDL_Surface *ph_surface = TTF_RenderText_Blended(toolbar->app->font, "搜索...", ph_len, ph_color);
+            if (ph_surface) {
+                SDL_Texture *ph_tex = SDL_CreateTextureFromSurface(renderer, ph_surface);
+                if (ph_tex) {
+                    SDL_FRect dst = {
+                        (float)(search_box_x + 8), 
+                        (float)(search_box_y + (search_box_h - ph_surface->h) / 2),
+                        (float)ph_surface->w, 
+                        (float)ph_surface->h
+                    };
+                    SDL_RenderTexture(renderer, ph_tex, NULL, &dst);
+                    SDL_DestroyTexture(ph_tex);
+                }
+                SDL_DestroySurface(ph_surface);
+            }
+        }
     }
-    
-    // 清理搜索结果
-    free(search_results);
 }
+```
 
-// 导航到指定的历史记录索引
-void navigate_to_history_index(Toolbar *toolbar, int target_index) {
+- 搜索与地址栏（接口骨架）
+```c
+void toolbar_search_start(Toolbar *toolbar) {
     if (!toolbar) return;
-    
-    if (target_index >= 0 && target_index < toolbar->history_count) {
-        printf("导航到历史记录索引: %d\n", target_index);
-        
-        // 更新历史记录索引
-        toolbar->history_index = target_index;
-        const char *path = toolbar->history[target_index];
-        
-        printf("目标路径: %s\n", path);
-        
-        // 验证路径是否仍然有效
-        if (validate_path(path)) {
-            // 执行导航
-            execute_navigation(toolbar, path);
-            
-            // 更新按钮状态
-            toolbar_update_button_states(toolbar);
-            
-            printf("导航成功完成\n");
-        } else {
-            printf("路径无效，无法导航: %s\n", path);
-            
-            // 从历史记录中移除无效路径
-            remove_invalid_history_item(toolbar, target_index);
-        }
-    } else {
-        printf("无效的历史记录索引: %d (范围: 0-%d)\n", 
-               target_index, toolbar->history_count - 1);
-    }
+    toolbar->search_active = true;
+    toolbar->search_cursor_pos = (int)strlen(toolbar->search_text);
+    if (toolbar->app && toolbar->app->window) SDL_StartTextInput(toolbar->app->window);
 }
-
-// 验证路径是否有效
-bool validate_path(const char *path) {
-    if (!path) return false;
-    
-    // 检查路径是否为空
-    if (strlen(path) == 0) return false;
-    
-    // 检查路径是否包含非法字符
-    if (strchr(path, '<') || strchr(path, '>') || strchr(path, '|')) {
-        return false;
-    }
-    
-    // 这里可以添加更多的路径验证逻辑
-    // 例如：检查文件系统权限、路径是否存在等
-    
-    return true;
-}
-
-// 执行导航操作
-void execute_navigation(Toolbar *toolbar, const char *path) {
-    if (!toolbar || !path) return;
-    
-    printf("正在导航到: %s\n", path);
-    
-    // 1. 通知主窗口开始导航
-    if (toolbar->app && toolbar->app->user_data) {
-        MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-        printf("通知主窗口导航到: %s\n", path);
-        // 调用主窗口的导航方法
-        // main_window_navigate_to(main_window, path);
-    }
-    
-    // 2. 更新地址栏显示
-    strncpy(toolbar->address_bar_text, path, sizeof(toolbar->address_bar_text) - 1);
-    toolbar->address_bar_text[sizeof(toolbar->address_bar_text) - 1] = '\0';
-    
-    // 3. 重置搜索和地址栏状态
+void toolbar_search_stop(Toolbar *toolbar) {
+    if (!toolbar) return;
     toolbar->search_active = false;
-    toolbar->address_bar_active = false;
-    toolbar->address_bar_editing = false;
-    
-    printf("导航操作完成\n");
+    if (toolbar->app && toolbar->app->window && !toolbar->address_bar_active) SDL_StopTextInput(toolbar->app->window);
 }
-
-// 移除无效的历史记录项
-void remove_invalid_history_item(Toolbar *toolbar, int index) {
-    if (!toolbar || index < 0 || index >= toolbar->history_count) return;
-    
-    printf("正在移除无效的历史记录项: %d\n", index);
-    
-    // 释放内存
-    free(toolbar->history[index]);
-    
-    // 移动后面的记录
-    for (int i = index; i < toolbar->history_count - 1; i++) {
-        toolbar->history[i] = toolbar->history[i + 1];
+void toolbar_search_handle_text(Toolbar *toolbar, const char *text) {
+    if (!toolbar || !toolbar->search_active || !text) return;
+    size_t len = strlen(toolbar->search_text), tlen = strlen(text);
+    if (len + tlen < sizeof(toolbar->search_text)-1) {
+        memmove(&toolbar->search_text[toolbar->search_cursor_pos + tlen], &toolbar->search_text[toolbar->search_cursor_pos], len - toolbar->search_cursor_pos + 1);
+        memcpy(&toolbar->search_text[toolbar->search_cursor_pos], text, tlen);
+        toolbar->search_cursor_pos += (int)tlen;
+        toolbar_search(toolbar, toolbar->search_text);
     }
-    
-    toolbar->history_count--;
-    
-    // 调整当前索引
-    if (toolbar->history_index >= index) {
-        toolbar->history_index--;
-    }
-    
-    printf("无效历史记录项已移除，当前数量: %d\n", toolbar->history_count);
 }
-
-// 历史记录统计信息
-void print_history_statistics(Toolbar *toolbar) {
+void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode sc) {
+    if (!toolbar || !toolbar->search_active) return;
+    size_t len = strlen(toolbar->search_text);
+    switch (sc) {
+        case SDL_SCANCODE_BACKSPACE:
+            if (toolbar->search_cursor_pos > 0 && len > 0) {
+                memmove(&toolbar->search_text[toolbar->search_cursor_pos-1], &toolbar->search_text[toolbar->search_cursor_pos], len - toolbar->search_cursor_pos + 1);
+                toolbar->search_cursor_pos--; toolbar_search(toolbar, toolbar->search_text);
+            } break;
+        case SDL_SCANCODE_RETURN:
+            if (toolbar->search_text[0] != '\0') toolbar_search(toolbar, toolbar->search_text);
+            toolbar_search_stop(toolbar); break;
+        case SDL_SCANCODE_ESCAPE: toolbar_search_stop(toolbar); break;
+        case SDL_SCANCODE_LEFT: if (toolbar->search_cursor_pos > 0) toolbar->search_cursor_pos--; break;
+        case SDL_SCANCODE_RIGHT: if (toolbar->search_cursor_pos < (int)len) toolbar->search_cursor_pos++; break;
+        case SDL_SCANCODE_L: if (SDL_GetModState() & SDL_KMOD_CTRL) { toolbar->search_text[0]='\0'; toolbar->search_cursor_pos=0; toolbar_search(toolbar, ""); } break;
+        default: break;
+    }
+}
+```
+```c
+void toolbar_address_bar_start(Toolbar *toolbar) {
     if (!toolbar) return;
-    
-    printf("\n=== 历史记录统计信息 ===\n");
-    printf("总记录数: %d\n", toolbar->history_count);
-    printf("数组容量: %d\n", toolbar->history_capacity);
-    printf("当前索引: %d\n", toolbar->history_index);
-    printf("内存使用: %.2f KB\n", 
-           (toolbar->history_count * sizeof(char*) + 
-            toolbar->history_count * 100) / 1024.0);
-    
-    if (toolbar->history_count > 0) {
-        printf("最早记录: %s\n", toolbar->history[0]);
-        printf("最新记录: %s\n", toolbar->history[toolbar->history_count - 1]);
-        printf("当前记录: %s\n", toolbar->history[toolbar->history_index]);
-    }
-    
-    printf("========================\n\n");
+    toolbar->address_bar_active = true;
+    toolbar->address_bar_cursor_pos = (int)strlen(toolbar->address_bar_text);
+    if (toolbar->app && toolbar->app->window) SDL_StartTextInput(toolbar->app->window);
 }
-
-// 主函数
-int main() {
-    // 初始化SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL初始化失败: %s\n", SDL_GetError());
-        return -1;
+void toolbar_address_bar_stop(Toolbar *toolbar) {
+    if (!toolbar) return;
+    toolbar->address_bar_active = false;
+    if (toolbar->app && toolbar->app->window && !toolbar->search_active) SDL_StopTextInput(toolbar->app->window);
+}
+void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text) {
+    if (!toolbar || !toolbar->address_bar_active || !text) return;
+    size_t len = strlen(toolbar->address_bar_text), tlen = strlen(text);
+    if (len + tlen < sizeof(toolbar->address_bar_text)-1) {
+        memmove(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos + tlen], &toolbar->address_bar_text[toolbar->address_bar_cursor_pos], len - toolbar->address_bar_cursor_pos + 1);
+        memcpy(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos], text, tlen);
+        toolbar->address_bar_cursor_pos += (int)tlen;
     }
-    
-    // 创建主窗口
-    Window *window = window_new("高级历史记录管理示例", 800, 600);
-    if (!window) {
-        fprintf(stderr, "窗口创建失败\n");
-        SDL_Quit();
-        return -1;
+}
+void toolbar_address_bar_handle_key(Toolbar *toolbar, SDL_Scancode sc) {
+    if (!toolbar || !toolbar->address_bar_active) return;
+    size_t len = strlen(toolbar->address_bar_text);
+    switch (sc) {
+        case SDL_SCANCODE_BACKSPACE:
+            if (toolbar->address_bar_cursor_pos > 0 && len > 0) {
+                memmove(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos-1], &toolbar->address_bar_text[toolbar->address_bar_cursor_pos], len - toolbar->address_bar_cursor_pos + 1);
+                toolbar->address_bar_cursor_pos--;
+            } break;
+        case SDL_SCANCODE_RETURN:
+            if (toolbar->address_bar_text[0] != '\0') toolbar_address_bar_navigate(toolbar, toolbar->address_bar_text);
+            toolbar_address_bar_stop(toolbar); break;
+        case SDL_SCANCODE_ESCAPE: toolbar_address_bar_stop(toolbar); break;
+        case SDL_SCANCODE_LEFT: if (toolbar->address_bar_cursor_pos > 0) toolbar->address_bar_cursor_pos--; break;
+        case SDL_SCANCODE_RIGHT: if (toolbar->address_bar_cursor_pos < (int)len) toolbar->address_bar_cursor_pos++; break;
+        default: break;
     }
-    
-    // 创建工具栏
-    Toolbar *toolbar = toolbar_new(window);
-    if (!toolbar) {
-        fprintf(stderr, "工具栏创建失败\n");
-        window_free(window);
-        SDL_Quit();
-        return -1;
-    }
-    
-    printf("工具栏创建成功\n");
-    
-    // 添加一些测试历史记录
-    toolbar_notify_directory_changed(toolbar, "/home/user");
-    toolbar_notify_directory_changed(toolbar, "/home/user/documents");
-    toolbar_notify_directory_changed(toolbar, "/home/user/pictures");
-    toolbar_notify_directory_changed(toolbar, "/home/user/music");
-    toolbar_notify_directory_changed(toolbar, "/home/user/videos");
-    
-    // 显示初始统计信息
-    print_history_statistics(toolbar);
-    
-    // 执行高级历史记录管理
-    advanced_history_management(toolbar);
-    
-    // 搜索历史记录
-    search_history(toolbar, "user");
-    
-    // 显示最终统计信息
-    print_history_statistics(toolbar);
-    
-    // 主事件循环
-    SDL_Event event;
-    bool running = true;
-    
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            
-            // 处理工具栏事件
-            toolbar_handle_event(toolbar, &event);
-        }
-        
-        // 渲染
-        SDL_SetRenderDrawColor(window->renderer, 255, 255, 255, 255);
-        SDL_RenderClear(window->renderer);
-        toolbar_draw(toolbar);
-        SDL_RenderPresent(window->renderer);
-        
-        SDL_Delay(16);
-    }
-    
-    // 清理
-    toolbar_free(toolbar);
-    window_free(window);
-    SDL_Quit();
-    
-    return 0;
 }
 ```
 
-**编译和运行**:
-```bash
-# 编译
-gcc -Wall -Wextra -std=c99 -I../include advanced_history.c ../src/toolbar.c ../src/window.c -o advanced_history -lSDL2
+---
 
-# 运行
-./advanced_history
-```
+## 自检清单与故障定位
+- 必备入口：`toolbar_new/toolbar_free/toolbar_handle_event/toolbar_draw/toolbar_notify_directory_changed`
+- 搜索/地址栏互斥：任一激活时，另一个需停止；对应 `SDL_StartTextInput/SDL_StopTextInput` 匹配。
+- 历史可用性：后退可用 `history_index>0`；前进可用 `history_index<history_count-1`。
+- 常见症状 → 排查点
+  - “看得到点不到”：按钮 `rect` 是否为 0；`find_button_at_point` 与 `pressed/hovered` 状态是否更新。
+  - “后退/前进灰置”：外部导航后未调用 `toolbar_notify_directory_changed`。
+  - “搜索无输入”：激活时是否调用 `SDL_StartTextInput(window)`；文本插入是否考虑光标位置与 memmove。
+  - “布局错位”：搜索按钮位置是否在 `toolbar_draw` 与搜索框同步。
 
-**功能说明**:
-- 实现历史记录数量限制和自动清理
-- 支持历史记录去重处理
-- 提供历史记录搜索功能
-- 实现智能路径验证和导航
-- 显示详细的历史记录统计信息
+以上内容确保：
+- 未来新增功能、调整布局与交互都有标准流程可循；
+- 对现有实现有逐段、逐行的定位与理解；
+- 误删实现中的关键段落后，可直接复制“粘贴修复片段”恢复到可用状态。
 
-**关键点**:
-- 内存管理和历史记录清理
-- 重复记录的检测和移除
-- 路径验证和错误处理
-- 搜索功能的实现
-- 统计信息的收集和显示
-
-## 样式定制
-
-### 颜色配置
-```c
-// 在toolbar.c中修改颜色常量
-static const SDL_Color TOOLBAR_BG_COLOR = {240, 240, 240, 255};      // 背景色
-static const SDL_Color BUTTON_COLOR = {200, 200, 200, 255};          // 按钮颜色
-static const SDL_Color BUTTON_HOVER_COLOR = {180, 180, 180, 255};    // 悬停颜色
-static const SDL_Color BUTTON_ACTIVE_COLOR = {160, 160, 160, 255};   // 激活颜色
-static const SDL_Color BUTTON_DISABLED_COLOR = {220, 220, 220, 128}; // 禁用颜色
-static const SDL_Color BUTTON_BORDER_COLOR = {100, 100, 100, 255};   // 边框颜色
-static const SDL_Color BUTTON_ICON_COLOR = {50, 50, 50, 255};       // 图标颜色
-```
-
-### 尺寸配置
-```c
-// 在toolbar.h中修改尺寸常量
-#define TOOLBAR_HEIGHT 40      // 工具栏高度
-#define BUTTON_PADDING 5       // 按钮内边距
-#define BUTTON_SIZE 30         // 按钮尺寸
-#define BUTTON_SPACING 10      // 按钮间距
-```
-
-## 最佳实践
-
-### 1. 内存管理
-- 始终检查函数返回值，确保内存分配成功
-- 在释放工具栏时，确保所有子资源都被正确释放
-- 使用calloc初始化结构体，避免未初始化内存
-
-### 2. 错误处理
-- 在每个函数开始时验证参数有效性
-- 提供有意义的错误信息和调试输出
-- 实现优雅的错误恢复机制
-
-### 3. 性能优化
-- 避免在渲染循环中进行复杂的计算
-- 使用适当的数据结构管理历史记录
-- 实现事件过滤，只处理相关事件
-
-### 4. 代码组织
-- 将相关功能组织在独立的函数中
-- 使用清晰的命名约定
-- 添加详细的注释说明复杂逻辑
-
-### 5. 扩展性
-- 设计模块化架构，便于添加新功能
-- 使用回调函数支持自定义操作
-- 保持接口的一致性和稳定性
-
-## 常见问题
-
-### Q1: 如何添加新的工具栏按钮？
-A1: 按照以下步骤：
-1. 在`ToolbarButtonType`枚举中添加新类型
-2. 在`toolbar_new`函数中初始化新按钮
-3. 在`draw_toolbar_button`函数中添加绘制逻辑
-4. 在`execute_button_action`函数中添加操作逻辑
-
-### Q2: 如何处理工具栏的自定义事件？
-A2: 在`toolbar_handle_event`函数中添加新的事件类型处理，或者使用回调函数机制。
-
-### Q3: 如何修改工具栏的样式？
-A3: 修改颜色常量、尺寸常量，或者在`draw_toolbar_button`函数中自定义绘制逻辑。
-
-### Q4: 如何集成工具栏与其他模块？
-A4: 使用`toolbar->app->user_data`访问主窗口，通过主窗口访问其他模块。
-
-## 总结
-
-Toolbar模块提供了完整的工具栏功能实现，包括按钮管理、事件处理、历史记录、搜索和地址栏等特性。通过本指南，开发者可以快速理解模块结构，掌握使用方法，并根据需要进行功能扩展和定制。
-
-该模块设计灵活，接口清晰，为FileScope应用程序提供了强大的用户交互能力。 

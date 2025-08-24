@@ -403,20 +403,20 @@ char* path_resolve_virtual(const char *virtual_path) {
     if (!virtual_path || !g_config.resolve_virtual) {
         return strdup(virtual_path);
     }
-    
+     // 遍历虚拟路径映射
     for (int i = 0; virtual_paths[i].virtual_name != NULL; i++) {
         if (virtual_paths[i].real_path && 
             strstr(virtual_path, virtual_paths[i].virtual_name)) {
             // 替换虚拟路径为真实路径
             char *result = malloc(strlen(virtual_path) + strlen(virtual_paths[i].real_path) + 1);
             if (result) {
-                char *pos = strstr(virtual_path, virtual_paths[i].virtual_name);
-                int prefix_len = pos - virtual_path;
+                char *pos = strstr(virtual_path, virtual_paths[i].virtual_name); // 找到虚拟路径位置
+                int prefix_len = pos - virtual_path;                                 // 前缀长度
                 
-                strncpy(result, virtual_path, prefix_len);
-                result[prefix_len] = '\0';
-                strcat(result, virtual_paths[i].real_path);
-                strcat(result, pos + strlen(virtual_paths[i].virtual_name));
+                strncpy(result, virtual_path, prefix_len);                             // 前缀,prefix_len是长度
+                result[prefix_len] = '\0';                                             // 结尾
+                strcat(result, virtual_paths[i].real_path);                          // 把映射到的真实路径拼接到前缀后面
+                strcat(result, pos + strlen(virtual_paths[i].virtual_name));       // 后缀
                 
                 return result;
             }
@@ -424,6 +424,7 @@ char* path_resolve_virtual(const char *virtual_path) {
     }
     
     return strdup(virtual_path);
+    //返回 virtual_path 的一份堆内存拷贝（新字符串），内容与入参相同，不做任何替换。
 }
 
 // 将相对路径转换为绝对路径
@@ -700,3 +701,15 @@ const char* path_get_error_string(PathError error) {
             return "Unknown error";
     }
 }
+/*先看 path_resolver.h：掌握对外 API/结构体/错误码；知道返回值是否需要 free。
+再看 path_resolver.c 顶部：
+全局配置/状态：g_config、g_initialized（了解默认行为、生命周期）。
+常量/映射：INVALID_CHARS、virtual_paths（知道非法字符和虚拟路径有哪些）。
+把握主流程（最关键）：从 path_resolve 开始“顺藤摸瓜”：
+1) path_get_type 判类型（环境变量/快捷方式/虚拟/绝对/相对）
+2) 条件处理：path_expand_environment、path_resolve_virtual、path_resolve_shortcut
+3) 统一：path_normalize
+4) 绝对化：path_to_absolute
+5) 校验/装配：path_validate（有些实现在入口先校验）→ 构造 PathInfo
+最后扫一眼工具函数：path_get_directory/path_get_filename/path_get_extension/path_get_basename/path_combine
+逐段关注点*/

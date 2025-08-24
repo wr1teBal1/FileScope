@@ -8,7 +8,7 @@
  */
 
 #include "sort.h"
-#include "../filesystem/path_resolver.h"
+#include "../../include/path_resolver.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>

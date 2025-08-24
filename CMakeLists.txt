@@ -26,9 +26,6 @@ add_executable(FileScope
     platform/sdl/init_sdl.c
     platform/sdl/renderer.c
     platform/sdl/window.c
-    platform/system/clipboard.c
-    platform/system/fs_api.c
-    platform/system/theme.c
 )
 
 # 项目自身的include目录

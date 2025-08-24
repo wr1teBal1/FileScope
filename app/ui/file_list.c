@@ -1569,7 +1569,9 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                 int visible_count = 0;
                 FileItem *item = view->files->head;
                 while (item) {
-                    if (!item->is_hidden || view->show_hidden) {
+                    bool is_visible = (!item->is_hidden || view->show_hidden) &&
+                                      (!view->has_search_filter || file_item_matches_search(item, view->search_filter));
+                    if (is_visible) {
                         if (visible_count == clicked_index) {
                             // 处理左键和右键点击
                             if (event->button.button == SDL_BUTTON_LEFT) {
@@ -1649,7 +1651,9 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                     int visible_count = 0;
                     FileItem *item = view->files->head;
                     while (item) {
-                        if (!item->is_hidden || view->show_hidden) {
+                        bool is_visible = (!item->is_hidden || view->show_hidden) &&
+                                          (!view->has_search_filter || file_item_matches_search(item, view->search_filter));
+                        if (is_visible) {
                             visible_count++;
                         }
                         item = item->next;

@@ -69,6 +69,12 @@
         "errno.h": "c",
         "sdl_close_code.h": "c",
         "sdl_error.h": "c",
-        "numbers": "c"
+        "numbers": "c",
+        "init_sdl.h": "c",
+        "ctype.h": "c",
+        "sdl_begin_code.h": "c",
+        "sdl_events.h": "c",
+        "sdl_audio.h": "c",
+        "sdl_keycode.h": "c"
     }
 }

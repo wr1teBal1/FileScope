@@ -1,44 +1,3 @@
-/*
- * 工具栏模块（与 sidebar.c 风格一致的深入解读）
- * 目标：提供统一、直观的导航与搜索入口，驱动文件视图的路径切换与过滤。
- * 
- * 职责（以侧边栏为参考的分层职责）：
- * 1. 视图层：绘制工具栏背景、边框、按钮（后退/前进/上一级/主目录/刷新/搜索/视图）。
- * 2. 交互层：响应鼠标移动/按下/抬起、键盘输入与文本输入（搜索）。
- * 3. 业务层：维护导航历史栈；触发目录切换、刷新、搜索过滤、视图模式切换。
- * 
- * 关键数据结构概览：
- * - Toolbar：模块根结构，保存按钮数组、历史记录、搜索输入状态与几何区域（rect）。
- * - ToolbarButton：单个按钮的类型、矩形区域、状态（enabled/hovered/pressed）与提示文本。
- * - 历史记录：以可扩容的 char* 数组管理，history_index 指向当前项，用于“后退/前进”。
- * 
- * 事件流转（对齐 sidebar.c 的事件处理方式）：
- * - 鼠标移动：更新按钮 hovered 状态（仅在工具栏矩形内）。
- * - 鼠标按下/抬起：命中测试 -> 标记 pressed -> 在抬起且仍在按钮内时执行对应动作。
- * - 文本输入/按键：当搜索激活时接管输入（编辑搜索文本、清除、回车执行、Esc 取消等）。
- * 
- * 绘制管线（保持与 sidebar 的“先背景/后前景”一致）：
- * 1) 绘制工具栏背景与边框；
- * 2) 依次绘制各按钮（根据状态切换颜色）；
- * 3) 绘制搜索框（含占位符/文本/光标/清除按钮）。
- * 
- * 与 sidebar.c 的协作与一致性：
- * - 布局常量：依赖 TOOLBAR_HEIGHT；侧边栏从 TOOLBAR_HEIGHT 之下开始，形成统一网格；
- * - 目录联动：通过回调链 main_window -> toolbar_notify_directory_changed 保持历史同步；
- * - 视觉统一：统一采用浅灰背景、线性边框与简单矢量图形图标，风格与 sidebar 保持一致。
- * 
- * 典型交互语义（与文件视图 file_list.c 协作）：
- * - 后退/前进：在历史记录中移动索引，并驱动 file_list_view_load_directory 加载目录；
- * - 上一级/主目录：根据当前路径裁剪或解析用户主目录，再加载目录并入栈；
- * - 刷新：对当前路径调用加载；
- * - 搜索：实时更新 file_list_view 的搜索过滤，不触发目录重载，仅过滤可见项；
- * - 视图：通知文件列表在图标/列表/详细信息间切换。
- * 
- * 内存与资源管理：
- * - new/free 对称：按需分配/释放历史记录条目与数组；
- * - 搜索文本存储于定长缓冲，不分配堆内存，避免碎片；
- * - 不持有 renderer 的所有权，绘制仅在传入的 Window/Renderer 有效时进行。
- */
 
 #include "toolbar.h"
 #include "renderer.h"
@@ -75,7 +34,7 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
         return;
     }
 
-    SDL_Renderer *renderer = toolbar->app->renderer;
+    SDL_Renderer *renderer = toolbar->app->renderer;  // 渲染器
     
     // 选择按钮颜色
     SDL_Color button_color;  // 按钮颜色
@@ -92,10 +51,10 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
     // 绘制按钮背景
     SDL_SetRenderDrawColor(renderer, button_color.r, button_color.g, button_color.b, button_color.a);
     SDL_FRect frect = {
-        (float)button->rect.x,
-        (float)button->rect.y,
-        (float)button->rect.w,
-        (float)button->rect.h
+        (float)button->rect.x,    // 矩形左上角X坐标
+        (float)button->rect.y,    // 矩形左上角Y坐标  
+        (float)button->rect.w,    // 矩形宽度
+        (float)button->rect.h     // 矩形高度
     };
     SDL_RenderFillRect(renderer, &frect);// 绘制矩形
     
@@ -106,9 +65,9 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
     // 绘制按钮图标
     SDL_SetRenderDrawColor(renderer, BUTTON_ICON_COLOR.r, BUTTON_ICON_COLOR.g, BUTTON_ICON_COLOR.b, BUTTON_ICON_COLOR.a);
     
-    int icon_size = BUTTON_SIZE / 2;
-    int icon_x = button->rect.x + (button->rect.w - icon_size) / 2;
-    int icon_y = button->rect.y + (button->rect.h - icon_size) / 2;
+    int icon_size = BUTTON_SIZE / 2;                                  // 图标尺寸  15
+    int icon_x = button->rect.x + (button->rect.w - icon_size) / 2;  // 图标左上角X坐标
+    int icon_y = button->rect.y + (button->rect.h - icon_size) / 2;  // 图标左上角Y坐标
     
     // 根据按钮类型绘制不同的图标
     switch (button->type) {
@@ -136,63 +95,66 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
             }
             break;
             
-        case BUTTON_UP:
-            // 绘制上一级箭头（闭合三角形+精确箭杆连接）
-            {
-                float top_x = icon_x + icon_size / 2.0f;
-                float top_y = icon_y;
-                float left_x = icon_x;
-                float left_y = icon_y + icon_size / 2.0f;
-                float right_x = icon_x + icon_size;
-                float right_y = icon_y + icon_size / 2.0f;
-                float mid_x = icon_x + icon_size / 2.0f;
-                float mid_y = icon_y + icon_size / 2.0f;
-                float shaft_bottom_y = icon_y + icon_size - 2;
+        // case BUTTON_UP:
+        //     // 绘制上一级箭头（闭合三角形+精确箭杆连接）
+        //     {
+        //         float top_x = icon_x + icon_size / 2.0f;
+        //         float top_y = icon_y;                     // 顶部坐标
 
-                // 闭合三角形
-                SDL_FPoint triangle[4] = {
-                    {top_x, top_y},
-                    {left_x, left_y},
-                    {right_x, right_y},
-                    {top_x, top_y}
-                };
-                SDL_RenderLines(renderer, triangle, 4);
-                // 箭杆与底边中点无缝连接
-                SDL_RenderLine(renderer, mid_x, mid_y, mid_x, shaft_bottom_y);
-            }
-            break;
+        //         float left_x = icon_x;
+        //         float left_y = icon_y + icon_size / 2.0f; // 左侧坐标
+
+        //         float right_x = icon_x + icon_size;
+        //         float right_y = icon_y + icon_size / 2.0f; // 右侧坐标
+
+        //         float mid_x = icon_x + icon_size / 2.0f;
+        //         float mid_y = icon_y + icon_size / 2.0f;         // 箭杆中点坐标
+        //         float shaft_bottom_y = icon_y + icon_size - 2;    // 箭杆底部坐标
+
+        //         // 闭合三角形
+        //         SDL_FPoint triangle[4] = {
+        //             {top_x, top_y},
+        //             {left_x, left_y},
+        //             {right_x, right_y},
+        //             {top_x, top_y}
+        //         };
+        //         SDL_RenderLines(renderer, triangle, 4);
+        //         // 箭杆与底边中点无缝连接
+        //         SDL_RenderLine(renderer, mid_x, mid_y, mid_x, shaft_bottom_y);
+        //     }
+        //     break;
             
-        case BUTTON_HOME:
-            // 绘制主目录图标 (闭合屋顶三角形+房屋主体与屋檐底边重合)
-            {
-                // 屋顶三角形
-                float roof_top_x = icon_x + icon_size / 2.0f;
-                float roof_top_y = icon_y;
-                float roof_left_x = icon_x;
-                float roof_left_y = icon_y + icon_size / 2.5f;
-                float roof_right_x = icon_x + icon_size;
-                float roof_right_y = icon_y + icon_size / 2.5f;
-                SDL_FPoint roof[4] = {
-                    {roof_top_x, roof_top_y},
-                    {roof_left_x, roof_left_y},
-                    {roof_right_x, roof_right_y},
-                    {roof_top_x, roof_top_y}
-                };
-                SDL_RenderLines(renderer, roof, 4);
+        // case BUTTON_HOME:
+        //     // 绘制主目录图标 (闭合屋顶三角形+房屋主体与屋檐底边重合)
+        //     {
+        //         // 屋顶三角形
+        //         float roof_top_x = icon_x + icon_size / 2.0f;
+        //         float roof_top_y = icon_y;
+        //         float roof_left_x = icon_x;
+        //         float roof_left_y = icon_y + icon_size / 2.5f;
+        //         float roof_right_x = icon_x + icon_size;
+        //         float roof_right_y = icon_y + icon_size / 2.5f;
+        //         SDL_FPoint roof[4] = {
+        //             {roof_top_x, roof_top_y},
+        //             {roof_left_x, roof_left_y},
+        //             {roof_right_x, roof_right_y},
+        //             {roof_top_x, roof_top_y}
+        //         };
+        //         SDL_RenderLines(renderer, roof, 4);
 
-                // 房屋主体（顶部与屋檐底边重合）
-                float house_x = roof_left_x + (roof_right_x - roof_left_x) / 4.0f;
-                float house_w = (roof_right_x - roof_left_x) / 2.0f;
-                float house_y = roof_left_y; // 顶部与屋檐底边重合
-                float house_h = icon_size - (house_y - icon_y) - 2;
-                SDL_FRect house = {house_x, house_y, house_w, house_h};
-                SDL_RenderRect(renderer, &house);
+        //         // 房屋主体（顶部与屋檐底边重合）
+        //         float house_x = roof_left_x + (roof_right_x - roof_left_x) / 4.0f;
+        //         float house_w = (roof_right_x - roof_left_x) / 2.0f;
+        //         float house_y = roof_left_y; // 顶部与屋檐底边重合
+        //         float house_h = icon_size - (house_y - icon_y) - 2;
+        //         SDL_FRect house = {house_x, house_y, house_w, house_h};
+        //         SDL_RenderRect(renderer, &house);
 
-                // 屋顶与房屋主体连接线（左右两侧）
-                SDL_RenderLine(renderer, roof_left_x, roof_left_y, house_x, house_y);
-                SDL_RenderLine(renderer, roof_right_x, roof_right_y, house_x + house_w, house_y);
-            }
-            break;
+        //         // 屋顶与房屋主体连接线（左右两侧）
+        //         SDL_RenderLine(renderer, roof_left_x, roof_left_y, house_x, house_y);
+        //         SDL_RenderLine(renderer, roof_right_x, roof_right_y, house_x + house_w, house_y);
+        //     }
+        //     break;
             
         case BUTTON_REFRESH:
             // 绘制刷新图标 (圆形)
@@ -203,16 +165,16 @@ static void draw_toolbar_button(Toolbar *toolbar, ToolbarButton *button) {
                 
                 // 绘制完整圆形
                 for (int i = 0; i < 16; i++) {
-                    double angle1 = i * M_PI / 8;
-                    double angle2 = (i + 1) * M_PI / 8;
+                    double angle1 = i * M_PI / 8;           // 当前角度
+                    double angle2 = (i + 1) * M_PI / 8;     // 下一个角度
                     
-                    float x1 = cx + r * cos(angle1);
-                    float y1 = cy + r * sin(angle1);
-                    float x2 = cx + r * cos(angle2);
-                    float y2 = cy + r * sin(angle2);
+                    float x1 = cx + r * cos(angle1);        // 当前点的X坐标
+                    float y1 = cy + r * sin(angle1);        // 当前点的Y坐标
+                    float x2 = cx + r * cos(angle2);        // 下一个点的X坐标
+                    float y2 = cy + r * sin(angle2);        // 下一个点的Y坐标
                     
-                    SDL_RenderLine(renderer, x1, y1, x2, y2);
-                }//有问题
+                    SDL_RenderLine(renderer, x1, y1, x2, y2); // 连接两点
+                }
                 
                 // 绘制箭头
                 SDL_FPoint arrow[3] = {
@@ -341,8 +303,8 @@ static void add_to_history(Toolbar *toolbar, const char *path) {
         return;
     }
     
-    toolbar->history_count++;
-    toolbar->history_index = toolbar->history_count - 1;
+    toolbar->history_count++; // 更新历史记录数量
+    toolbar->history_index = toolbar->history_count - 1; // 更新历史索引
     
     // 更新按钮状态
     toolbar->buttons[BUTTON_BACK].enabled = (toolbar->history_index > 0);
@@ -385,75 +347,75 @@ static void navigate_forward(Toolbar *toolbar) {
 }
 
 // 执行上一级操作
-static void navigate_up(Toolbar *toolbar) {
-    if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
-        return;
-    }
+// static void navigate_up(Toolbar *toolbar) {
+//     if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
+//         return;
+//     }
     
-    MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
-    FileListView *file_list = main_window->file_list_view;
+//     MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
+//     FileListView *file_list = main_window->file_list_view;
     
-    if (!file_list || !file_list->current_path) {
-        return;
-    }
+//     if (!file_list || !file_list->current_path) {
+//         return;
+//     }
     
-    // 获取上一级目录路径
-    char *path = strdup(file_list->current_path);
-    if (!path) {
-        return;
-    }
+//     // 获取上一级目录路径
+//     char *path = strdup(file_list->current_path);
+//     if (!path) {
+//         return;
+//     }
     
-    // 移除末尾的路径分隔符
-    size_t len = strlen(path);
-    if (len > 0 && (path[len - 1] == '/' || path[len - 1] == '\\')) {
-        path[len - 1] = '\0';
-        len--;
-    }
+//     // 移除末尾的路径分隔符
+//     size_t len = strlen(path);
+//     if (len > 0 && (path[len - 1] == '/' || path[len - 1] == '\\')) {
+//         path[len - 1] = '\0';
+//         len--;
+//     }
     
-    // 找到最后一个路径分隔符
-    char *last_sep = strrchr(path, '/');
-    if (!last_sep) {
-        last_sep = strrchr(path, '\\');
-    }
+//     // 找到最后一个路径分隔符
+//     char *last_sep = strrchr(path, '/');
+//     if (!last_sep) {
+//         last_sep = strrchr(path, '\\');
+//     }
     
-    if (last_sep) {
-        // 如果是根目录，保留路径分隔符
-        if (last_sep == path) {
-            path[1] = '\0';
-        } else {
-            *last_sep = '\0';
-        }
+//     if (last_sep) {
+//         // 如果是根目录，保留路径分隔符
+//         if (last_sep == path) {
+//             path[1] = '\0';
+//         } else {
+//             *last_sep = '\0';
+//         }
         
-        // 加载上一级目录
-        file_list_view_load_directory(file_list, path);
-        add_to_history(toolbar, path);
-    }
+//         // 加载上一级目录
+//         file_list_view_load_directory(file_list, path);
+//         add_to_history(toolbar, path);
+//     }
     
-    free(path);
-}
+//     free(path);
+// }
 
-// 执行主目录操作
-static void navigate_home(Toolbar *toolbar) {
-    if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
-        return;
-    }   //检查工具栏指针是否有效 检查应用程序引用是否有效 检查用户数据是否有效
+// // 执行主目录操作
+// static void navigate_home(Toolbar *toolbar) {
+//     if (!toolbar || !toolbar->app || !toolbar->app->user_data) {
+//         return;
+//     }   //检查工具栏指针是否有效 检查应用程序引用是否有效 检查用户数据是否有效
     
-    MainWindow *main_window = (MainWindow*)toolbar->app->user_data; // 从应用程序的用户数据中获取主窗口指针
-    FileListView *file_list = main_window->file_list_view;          // 获取文件列表视图
+//     MainWindow *main_window = (MainWindow*)toolbar->app->user_data; // 从应用程序的用户数据中获取主窗口指针
+//     FileListView *file_list = main_window->file_list_view;          // 获取文件列表视图
     
-    if (!file_list) {
-        return;              
-    }                                                                //确保文件列表视图存在
+//     if (!file_list) {
+//         return;              
+//     }                                                                //确保文件列表视图存在
     
    
-    const char *home_dir = SDL_GetUserFolder(SDL_FOLDER_HOME);
-    if (home_dir) {
-        file_list_view_load_directory(file_list, home_dir);
-        add_to_history(toolbar, home_dir);
-    }                                                                 //    如果成功获取主目录路径，
-                                                                     //     则：加载主目录到文件列表视图
-                                                                     //     并将主目录添加到导航历史记录
-}
+//     const char *home_dir = SDL_GetUserFolder(SDL_FOLDER_HOME);
+//     if (home_dir) {
+//         file_list_view_load_directory(file_list, home_dir);
+//         add_to_history(toolbar, home_dir);
+//     }                                                                 //    如果成功获取主目录路径，
+//                                                                      //     则：加载主目录到文件列表视图
+//                                                                      //     并将主目录添加到导航历史记录
+// }
 
 // 执行刷新操作
 static void refresh_view(Toolbar *toolbar) {
@@ -500,7 +462,6 @@ static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
             break;
             
         case BUTTON_SEARCH:
-            // 激活搜索功能
             toolbar_search_start(toolbar);
             break;
             
@@ -562,6 +523,7 @@ Toolbar* toolbar_new(struct Window *app) {
     button_x += BUTTON_SIZE + BUTTON_SPACING;
     
     // 上一级按钮
+    /* 移除上一级按钮布局与启用
     toolbar->buttons[BUTTON_UP].type = BUTTON_UP;
     toolbar->buttons[BUTTON_UP].rect.x = button_x;
     toolbar->buttons[BUTTON_UP].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
@@ -570,8 +532,16 @@ Toolbar* toolbar_new(struct Window *app) {
     toolbar->buttons[BUTTON_UP].tooltip = "上一级";
     toolbar->buttons[BUTTON_UP].enabled = true;
     button_x += BUTTON_SIZE + BUTTON_SPACING;
-    
+    */
+    /*
+     * 恢复“上一级(BUTTON_UP)”与“主目录(BUTTON_HOME)”按钮的方法：
+     * 1) 取消注释它们各自上方保留的布局代码块（rect/tooltip/enabled=true，并前移 button_x）。
+     * 2) 确保 enabled 设为 true，rect 使用 BUTTON_SIZE，参与左侧布局（更新 button_x）。
+     * 3) 行为逻辑已就绪：点击会触发 navigate_up / navigate_home（由 execute_button_action 分发）。
+     * 4) 事件与绘制代码无需改动；如需调整显示顺序，移动布局代码块位置即可。
+     */
     // 主目录按钮
+    /* 移除主目录按钮布局与启用
     toolbar->buttons[BUTTON_HOME].type = BUTTON_HOME;
     toolbar->buttons[BUTTON_HOME].rect.x = button_x;
     toolbar->buttons[BUTTON_HOME].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
@@ -580,6 +550,7 @@ Toolbar* toolbar_new(struct Window *app) {
     toolbar->buttons[BUTTON_HOME].tooltip = "主目录";
     toolbar->buttons[BUTTON_HOME].enabled = true;
     button_x += BUTTON_SIZE + BUTTON_SPACING;
+    */
     
     // 刷新按钮
     toolbar->buttons[BUTTON_REFRESH].type = BUTTON_REFRESH;
@@ -591,17 +562,28 @@ Toolbar* toolbar_new(struct Window *app) {
     toolbar->buttons[BUTTON_REFRESH].enabled = true;
     button_x += BUTTON_SIZE + BUTTON_SPACING;
     
-    // 搜索按钮
+    // 搜索按钮：移动到搜索输入框左侧（右对齐）
     toolbar->buttons[BUTTON_SEARCH].type = BUTTON_SEARCH;
-    toolbar->buttons[BUTTON_SEARCH].rect.x = button_x;
-    toolbar->buttons[BUTTON_SEARCH].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
-    toolbar->buttons[BUTTON_SEARCH].rect.w = BUTTON_SIZE;
-    toolbar->buttons[BUTTON_SEARCH].rect.h = BUTTON_SIZE;
+    {    
+        // 计算搜索框位置
+        int search_box_w = 220;
+        int search_box_h = BUTTON_SIZE;
+        int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING;
+        int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2; 
+
+        // 计算搜索按钮位置
+        int search_btn_x = search_box_x - BUTTON_SPACING - BUTTON_SIZE;
+        int search_btn_y = search_box_y;
+        toolbar->buttons[BUTTON_SEARCH].rect.x = search_btn_x;
+        toolbar->buttons[BUTTON_SEARCH].rect.y = search_btn_y;
+        toolbar->buttons[BUTTON_SEARCH].rect.w = BUTTON_SIZE;
+        toolbar->buttons[BUTTON_SEARCH].rect.h = BUTTON_SIZE;
+    }
     toolbar->buttons[BUTTON_SEARCH].tooltip = "搜索";
     toolbar->buttons[BUTTON_SEARCH].enabled = true;
-    button_x += BUTTON_SIZE + BUTTON_SPACING;
+    // 不增加button_x，避免占用左侧布局位置
     
-    // 视图按钮
+    // 视图按钮（留在左侧按钮组中，承接当前button_x）
     toolbar->buttons[BUTTON_VIEW].type = BUTTON_VIEW;
     toolbar->buttons[BUTTON_VIEW].rect.x = button_x;
     toolbar->buttons[BUTTON_VIEW].rect.y = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
@@ -623,9 +605,16 @@ Toolbar* toolbar_new(struct Window *app) {
     toolbar->history_count = 0; // 历史记录数量
     toolbar->history_index = -1; // 当前历史记录索引
 
+    // 初始化搜索文本
     toolbar->search_text[0] = '\0';// 将搜索文本设置为空字符串
     toolbar->search_active = false;// 搜索是否激活
     toolbar->search_cursor_pos = 0;// 搜索光标位置
+
+    // 地址栏初始化
+    toolbar->address_bar_text[0] = '\0';
+    toolbar->address_bar_active = false;
+    toolbar->address_bar_cursor_pos = 0;
+    toolbar->address_bar_editing = false;
     
     return toolbar;
 }
@@ -643,6 +632,7 @@ void toolbar_free(Toolbar *toolbar) {
                 free(toolbar->history[i]); // 释放每个历史记录字符串
             }
         }
+
         free(toolbar->history); // 释放历史记录指针数组
     }
     
@@ -656,6 +646,7 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
     } //验证工具栏和事件指针是否有效
     
     switch (event->type) { // 根据事件类型执行不同的操作
+
         case SDL_EVENT_MOUSE_MOTION: // 鼠标移动事件
             {
                 int x = event->motion.x; // 获取鼠标x坐标
@@ -693,6 +684,7 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
                     x >= toolbar->rect.x && x < toolbar->rect.x + toolbar->rect.w &&
                     y >= toolbar->rect.y && y < toolbar->rect.y + toolbar->rect.h) {
                     
+                    // 计算搜索框位置
                     // 检查是否点击了搜索框
                     // 计算搜索框位置 宽度 高度  x坐标  y坐标
                     int search_box_w = 220; // 搜索框宽度
@@ -700,6 +692,29 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
                     int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING; // 搜索框x坐标
                     int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2; // 搜索框y坐标
                     
+                    // 计算地址栏位置：左侧紧随视图按钮，右侧在搜索按钮左侧
+                    int left_group_right = toolbar->buttons[BUTTON_VIEW].rect.x + toolbar->buttons[BUTTON_VIEW].rect.w;
+                    int address_left_x = left_group_right + BUTTON_SPACING; // 地址栏左侧x坐标
+                   
+                    // 搜索按钮位置
+                    int search_btn_left = search_box_x - BUTTON_SPACING - BUTTON_SIZE;
+                    int address_right_limit = search_btn_left - BUTTON_SPACING;
+                    int available_w = address_right_limit - address_left_x;
+                    int address_box_w = available_w;
+                    if (address_box_w > 320) address_box_w = 320; // 最大宽度
+                    if (address_box_w < 140) address_box_w = 140; // 最小宽度
+                    int address_box_h = BUTTON_SIZE;
+                    int address_box_x = address_left_x;
+                    int address_box_y = toolbar->rect.y + (toolbar->rect.h - address_box_h) / 2;
+                    
+                    // 地址栏命中测试
+                    if (x >= address_box_x && x < address_box_x + address_box_w &&
+                        y >= address_box_y && y < address_box_y + address_box_h) {
+                        // 激活地址栏，互斥搜索
+                        toolbar->search_active = false;     // 设置搜索状态为false
+                        toolbar_address_bar_start(toolbar);   // 调用地址栏开始函数
+                        return true;
+                    }
                     if (x >= search_box_x && x < search_box_x + search_box_w && // 检查鼠标是否在搜索框区域内
                         y >= search_box_y && y < search_box_y + search_box_h) {
                         
@@ -725,6 +740,7 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
                             // 如果搜索栏已经激活，不做任何操作
                         } else {
                             // 如果搜索栏未激活，重新激活搜索
+                            toolbar->address_bar_active = false; // 互斥地址栏
                             toolbar_search_start(toolbar);
                             // 保持现有的搜索文本
                         }
@@ -732,6 +748,13 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
                     } else if (toolbar->search_active) {
                         // 点击了搜索框外的区域，停止搜索
                         toolbar_search_stop(toolbar);
+                    }
+                    // 若地址栏处于激活且点击在其外部，停止地址栏
+                    if (toolbar->address_bar_active) {
+                        if (!(x >= address_box_x && x < address_box_x + address_box_w &&
+                              y >= address_box_y && y < address_box_y + address_box_h)) {
+                            toolbar_address_bar_stop(toolbar);
+                        }
                     }
                     
                     // 查找点击的按钮
@@ -776,14 +799,26 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
                 toolbar_search_handle_key(toolbar, event->key.scancode); // 处理键盘输入
                 return true; // 返回true 表示事件已处理
             }
+            // 如果地址栏激活，处理键盘输入
+            if (toolbar->address_bar_active) {
+                printf("[DEBUG] 地址栏收到按键: %d\n", event->key.scancode);
+                toolbar_address_bar_handle_key(toolbar, event->key.scancode);
+                return true;
+            }
             break;
             
-        case SDL_EVENT_TEXT_INPUT:
+        case SDL_EVENT_TEXT_INPUT: //文本输入事件
             // 如果搜索栏激活，处理文本输入
             if (toolbar->search_active) {
                 printf("[DEBUG] 收到文本输入: '%s'\n", event->text.text);
                 toolbar_search_handle_text(toolbar, event->text.text);  // 处理文本输入
                 return true; // 返回true 表示事件已处理
+            }
+            // 如果地址栏激活，处理文本输入
+            if (toolbar->address_bar_active) {
+                printf("[DEBUG] 地址栏文本输入: '%s'\n", event->text.text);
+                toolbar_address_bar_handle_text(toolbar, event->text.text);
+                return true;
             }
             break;
             
@@ -808,8 +843,10 @@ void toolbar_draw(Toolbar *toolbar) {
         return;
     } // 验证工具栏、窗口和渲染器指针是否有效
     SDL_Renderer *renderer = toolbar->app->renderer; // 获取渲染器
+
     // 绘制工具栏背景 
     SDL_SetRenderDrawColor(renderer, TOOLBAR_BG_COLOR.r, TOOLBAR_BG_COLOR.g, TOOLBAR_BG_COLOR.b, TOOLBAR_BG_COLOR.a); 
+   
     // 设置工具栏矩形区域
     SDL_FRect toolbar_frect = {
         (float)toolbar->rect.x, // 工具栏x坐标
@@ -818,21 +855,107 @@ void toolbar_draw(Toolbar *toolbar) {
         (float)toolbar->rect.h // 工具栏高度
     };
     SDL_RenderFillRect(renderer, &toolbar_frect);
+    
     // 绘制工具栏边框
     SDL_SetRenderDrawColor(renderer, BUTTON_BORDER_COLOR.r, BUTTON_BORDER_COLOR.g, BUTTON_BORDER_COLOR.b, BUTTON_BORDER_COLOR.a);
+    
     SDL_RenderRect(renderer, &toolbar_frect);
     // 绘制工具栏按钮
     for (int i = 0; i < toolbar->button_count; i++) {
         draw_toolbar_button(toolbar, &toolbar->buttons[i]);
     }
-    // 绘制搜索输入框（右侧，边界分明）
+
+    // 计算地址栏区域（位于左侧按钮与搜索框之间）
     int search_box_w = 220;
     int search_box_h = BUTTON_SIZE;
     int search_box_x = toolbar->rect.x + toolbar->rect.w - search_box_w - BUTTON_PADDING;
     int search_box_y = toolbar->rect.y + (toolbar->rect.h - search_box_h) / 2;
+    int left_group_right = toolbar->buttons[BUTTON_VIEW].rect.x + toolbar->buttons[BUTTON_VIEW].rect.w;
+    int address_left_x = left_group_right + BUTTON_SPACING;
+    // 搜索按钮位置
+    int search_btn_left = search_box_x - BUTTON_SPACING - BUTTON_SIZE;
+    int address_right_limit = search_btn_left - BUTTON_SPACING;
+    int available_w = address_right_limit - address_left_x;
+    int address_box_w = available_w;
+    if (address_box_w > 320) address_box_w = 320; // 最大宽度
+    if (address_box_w < 140) address_box_w = 140; // 最小宽度
+    int address_box_h = BUTTON_SIZE;
+    int address_box_x = address_left_x;
+    int address_box_y = toolbar->rect.y + (toolbar->rect.h - address_box_h) / 2;
+    SDL_FRect address_box = { (float)address_box_x, (float)address_box_y, (float)address_box_w, (float)address_box_h };
+    // 地址栏背景与边框
+    SDL_Color addr_bg = toolbar->address_bar_active ? (SDL_Color){255, 255, 240, 255} : (SDL_Color){255, 255, 255, 255};
+    SDL_Color addr_border = toolbar->address_bar_active ? (SDL_Color){0, 120, 215, 255} : (SDL_Color){100, 100, 100, 255};
+    // 绘制地址栏背景
+    SDL_SetRenderDrawColor(renderer, addr_bg.r, addr_bg.g, addr_bg.b, addr_bg.a); // 设置背景颜色
+    SDL_RenderFillRect(renderer, &address_box);                                 // 填充背景
+    //   绘制地址栏边框
+    SDL_SetRenderDrawColor(renderer, addr_border.r, addr_border.g, addr_border.b, addr_border.a);
+    SDL_RenderRect(renderer, &address_box);
+    // 地址栏文本（优先显示正在编辑的文本；否则显示当前路径占位）
+    SDL_Color addr_text_color = (SDL_Color){30, 30, 30, 255};
+    const char *addr_text_to_show = NULL;
+    if (toolbar->address_bar_active || toolbar->address_bar_text[0] != '\0') {
+        addr_text_to_show = toolbar->address_bar_text;
+    } else {
+        // 使用当前路径作为占位显示
+        if (toolbar->app && toolbar->app->user_data) {
+            MainWindow *mw = (MainWindow*)toolbar->app->user_data;
+            if (mw && mw->file_list_view && mw->file_list_view->current_path) {
+                addr_text_to_show = mw->file_list_view->current_path;
+            }
+        }
+    }
+    if (addr_text_to_show && toolbar->app->font) {
+        size_t addr_len = strlen(addr_text_to_show);
+        SDL_Surface *addr_surface = TTF_RenderText_Blended(toolbar->app->font, addr_text_to_show, addr_len, addr_text_color);
+        if (addr_surface) {
+            SDL_Texture *addr_tex = SDL_CreateTextureFromSurface(renderer, addr_surface);
+            if (addr_tex) {
+                int text_x = address_box_x + 8;
+                SDL_FRect dst = { 
+                    (float)text_x,
+                    (float)(address_box_y + (address_box_h - addr_surface->h) / 2),
+                    (float)addr_surface->w,
+                    (float)addr_surface->h };
+                // 裁剪显示，避免超出
+                if (dst.w > address_box.w - 16) dst.w = address_box.w - 16;
+                SDL_RenderTexture(renderer, addr_tex, NULL, &dst);
+                SDL_DestroyTexture(addr_tex);
+            }
+            SDL_DestroySurface(addr_surface);
+        }
+    }
+    // 绘制地址栏光标
+    if (toolbar->address_bar_active) {
+        int caret_x = address_box_x + 8;
+        if (toolbar->address_bar_text[0] != '\0' && toolbar->app->font) {
+            char temp_addr[1024];
+            int cp = toolbar->address_bar_cursor_pos;
+            if (cp < 0) cp = 0;
+            if (cp > (int)strlen(toolbar->address_bar_text)) cp = (int)strlen(toolbar->address_bar_text);
+            strncpy(temp_addr, toolbar->address_bar_text, cp);
+            temp_addr[cp] = '\0';
+            SDL_Surface *pre_surface = TTF_RenderText_Blended(toolbar->app->font, temp_addr, strlen(temp_addr), addr_text_color);
+            if (pre_surface) {
+                caret_x += pre_surface->w; // 将光标位置向右移动
+                SDL_DestroySurface(pre_surface);   //释放临时表面
+            }
+        }
+        // 绘制光标
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // 设置颜色为黑色
+        SDL_RenderLine(renderer, caret_x, address_box_y + 4, caret_x, address_box_y + address_box_h - 4);
+    }
+    // 绘制搜索输入框（右侧，边界分明）
     SDL_FRect search_box = {
         (float)search_box_x, (float)search_box_y, (float)search_box_w, (float)search_box_h
     };
+    
+    // 同步搜索按钮位置到搜索框左侧
+    toolbar->buttons[BUTTON_SEARCH].rect.x = search_box_x - BUTTON_SPACING - BUTTON_SIZE;
+    toolbar->buttons[BUTTON_SEARCH].rect.y = search_box_y;
+    toolbar->buttons[BUTTON_SEARCH].rect.w = BUTTON_SIZE;
+    toolbar->buttons[BUTTON_SEARCH].rect.h = BUTTON_SIZE;
     
     // 根据搜索状态选择背景颜色
     SDL_Color search_bg_color = toolbar->search_active ?  // 如果搜索栏激活 
@@ -887,13 +1010,19 @@ void toolbar_draw(Toolbar *toolbar) {
         
         // 绘制清除搜索按钮（X）
         if (toolbar->search_text[0] != '\0') {
+            // 计算清除按钮位置
             int clear_button_size = 16;
             int clear_button_x = search_box_x + search_box_w - clear_button_size - 4;
             int clear_button_y = search_box_y + (search_box_h - clear_button_size) / 2;
             
             // 绘制清除按钮背景（圆形）
             SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-            SDL_FRect clear_button = {(float)clear_button_x, (float)clear_button_y, (float)clear_button_size, (float)clear_button_size};
+            SDL_FRect clear_button = {
+                (float)clear_button_x,
+                (float)clear_button_y,
+                (float)clear_button_size,
+                (float)clear_button_size
+            };
             SDL_RenderFillRect(renderer, &clear_button);
             
             // 绘制X符号
@@ -974,6 +1103,9 @@ void toolbar_search_handle_text(Toolbar *toolbar, const char *text) { // 处理�
         memmove(&toolbar->search_text[toolbar->search_cursor_pos + tlen],
                &toolbar->search_text[toolbar->search_cursor_pos], 
                len - toolbar->search_cursor_pos + 1);           // 将搜索文本从光标位置开始向后移动
+                //  参数1：目标位置（光标位置 + 新文本长度）
+                // 参数2：源位置（光标位置）
+                // 参数3：移动的字节数（从光标位置到末尾的文本长度 + 1）
         memcpy(&toolbar->search_text[toolbar->search_cursor_pos], text, tlen); // 将输入文本插入到搜索文本中
         toolbar->search_cursor_pos += tlen; // 更新光标位置
         printf("[DEBUG] 文本更新后: '%s', 光标位置: %d\n", 
@@ -1041,7 +1173,9 @@ bool toolbar_search(Toolbar *toolbar, const char *search_term) {
         return false;
     }
     
+    //将用户数据转换为主窗口指针
     MainWindow *main_window = (MainWindow*)toolbar->app->user_data;
+
     if (!main_window || !main_window->file_list_view) {
         return false;
     }
@@ -1057,4 +1191,129 @@ bool toolbar_search(Toolbar *toolbar, const char *search_term) {
     
     return true;
 }
+
+void toolbar_address_bar_start(Toolbar *toolbar) {
+    if (!toolbar) return;
+    printf("[DEBUG] 地址栏激活\n");
+    toolbar->address_bar_active = true;
+    // 将光标置于末尾
+    toolbar->address_bar_cursor_pos = (int)strlen(toolbar->address_bar_text);
+    // 启用文本输入
+    if (toolbar->app && toolbar->app->window) {
+        SDL_StartTextInput(toolbar->app->window);
+    }
+}
+
+void toolbar_address_bar_stop(Toolbar *toolbar) {
+    if (!toolbar) return;
+    printf("[DEBUG] 地址栏停止\n");
+    toolbar->address_bar_active = false;
+    // 停止文本输入（若搜索未激活）
+    if (toolbar->app && toolbar->app->window && !toolbar->search_active) {
+        SDL_StopTextInput(toolbar->app->window);
+    }
+}
+
+void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text) {
+    if (!toolbar || !toolbar->address_bar_active || !text) return;
+    size_t len = strlen(toolbar->address_bar_text);
+    size_t tlen = strlen(text);
+    if (len + tlen < sizeof(toolbar->address_bar_text) - 1) {
+        memmove(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos + tlen],
+                &toolbar->address_bar_text[toolbar->address_bar_cursor_pos],
+                len - toolbar->address_bar_cursor_pos + 1);
+        memcpy(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos], text, tlen);
+        toolbar->address_bar_cursor_pos += (int)tlen;
+        printf("[DEBUG] 地址栏文本: '%s'\n", toolbar->address_bar_text);
+    }
+}
+
+void toolbar_address_bar_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {
+    if (!toolbar || !toolbar->address_bar_active) return;
+    size_t len = strlen(toolbar->address_bar_text);
+    switch (scancode) {
+        case SDL_SCANCODE_BACKSPACE:
+            if (toolbar->address_bar_cursor_pos > 0 && len > 0) {
+                memmove(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos - 1],
+                        &toolbar->address_bar_text[toolbar->address_bar_cursor_pos],
+                        len - toolbar->address_bar_cursor_pos + 1);
+                toolbar->address_bar_cursor_pos--;
+            }
+            break;
+        case SDL_SCANCODE_RETURN:
+            if (toolbar->address_bar_text[0] != '\0') {
+                toolbar_address_bar_navigate(toolbar, toolbar->address_bar_text);
+            }
+            toolbar_address_bar_stop(toolbar);
+            break;
+        case SDL_SCANCODE_ESCAPE:
+            toolbar_address_bar_stop(toolbar);
+            break;
+        case SDL_SCANCODE_LEFT:
+            if (toolbar->address_bar_cursor_pos > 0) toolbar->address_bar_cursor_pos--;
+            break;
+        case SDL_SCANCODE_RIGHT:
+            if (toolbar->address_bar_cursor_pos < (int)len) toolbar->address_bar_cursor_pos++;
+            break;
+        default:
+            break;
+    }
+}
+
+void toolbar_address_bar_navigate(Toolbar *toolbar, const char *path) {
+    if (!toolbar || !path || !toolbar->app || !toolbar->app->user_data) return;
+    MainWindow *mw = (MainWindow*)toolbar->app->user_data;
+    if (!mw || !mw->file_list_view) return;
+    printf("[DEBUG] 地址栏导航到: %s\n", path);
+    file_list_view_load_directory(mw->file_list_view, path);
+    add_to_history(toolbar, path);
+}
+
+/*
+ * 模块阅读顺序建议（从整体到细节，便于快速上手与排错）
+ * 
+ * 1) 顶部常量与样式：
+ *    - TOOLBAR_HEIGHT/BUTTON_SIZE/颜色常量：理解布局与视觉基调。
+ * 
+ * 2) 基础绘制原语：
+ *    - draw_toolbar_button：按钮外观（背景/边框/图标）的绘制细节与状态色切换。
+ * 
+ * 3) 事件命中与基础工具：
+ *    - find_button_at_point：命中测试；
+ *    - add_to_history：历史栈维护（裁剪、扩容、索引、按钮状态联动）。
+ * 
+ * 4) 导航业务动作（按钮语义）：
+ *    - navigate_back / navigate_forward：历史索引移动与视图加载；
+ *    - navigate_up / navigate_home / refresh_view：路径裁剪、主目录解析与刷新；
+ *    - execute_button_action：按钮->动作的集中分发点。
+ * 
+ * 5) 生命周期：
+ *    - toolbar_new：布局、按钮、历史、搜索与地址栏初始状态；
+ *    - toolbar_free：历史记录释放与对象销毁。
+ * 
+ * 6) 事件主循环入口：
+ *    - toolbar_handle_event：鼠标移动/按下/抬起、键盘/文本输入的统一接入；
+ *      内含：搜索框与地址栏的命中/互斥激活逻辑与按钮按压状态管理。
+ * 
+ * 7) 渲染总线：
+ *    - toolbar_draw：背景/边框/按钮绘制；
+ *      地址栏与搜索框的布局、文本渲染、光标与清除按钮绘制；
+ *      注意与按钮组、窗口宽度的耦合与同步（搜索按钮与输入框）。
+ * 
+ * 8) 搜索子系统：
+ *    - toolbar_search_start/stop：文本输入启停与状态维护；
+ *    - toolbar_search_handle_text/handle_key：编辑、光标、快捷键（Ctrl+L/Enter/Esc）；
+ *    - toolbar_search：与文件列表视图的过滤联动（设置/清除过滤）。
+ * 
+ * 9) 地址栏子系统：
+ *    - toolbar_address_bar_start/stop：激活/停用与文本输入接管；
+ *    - toolbar_address_bar_handle_text/handle_key：编辑、光标、快捷键（Enter/Esc/方向键/Backspace）；
+ *    - toolbar_address_bar_navigate：路径导航与历史入栈。
+ * 
+ * 10) 外部协作：
+ *     - toolbar_notify_directory_changed：由外部目录切换回调，保持历史同步。
+ * 
+ * 阅读建议：先读 1-3 构建“外观与命中”心智模型，再读 4-6 理解“交互到动作”的主链路，
+ *           随后通读 7 抓住渲染与布局细节，最后分别细看 8-9 的两个输入子系统与 10 的协作点。
+ */
 

@@ -71,31 +71,31 @@ void toolbar_draw(Toolbar *toolbar);                          // 绘制工具栏
 void toolbar_notify_directory_changed(Toolbar *toolbar, const char *path);
 
 // 历史导航函数
-bool toolbar_go_back(Toolbar *toolbar);
-bool toolbar_go_forward(Toolbar *toolbar);
-bool toolbar_go_up(Toolbar *toolbar);
-bool toolbar_go_home(Toolbar *toolbar);
+bool toolbar_go_back(Toolbar *toolbar);      // 后退
+bool toolbar_go_forward(Toolbar *toolbar);   // 前进
+bool toolbar_go_up(Toolbar *toolbar);        // 上一级
+bool toolbar_go_home(Toolbar *toolbar);     // 主目录
 
 // 按钮操作函数
-bool toolbar_refresh(Toolbar *toolbar);
-bool toolbar_toggle_view(Toolbar *toolbar);
-bool toolbar_search(Toolbar *toolbar, const char *search_term);
+bool toolbar_refresh(Toolbar *toolbar);     // 刷新
+bool toolbar_toggle_view(Toolbar *toolbar);  // 视图切换
+bool toolbar_search(Toolbar *toolbar, const char *search_term);  // 搜索
 
 // 设置按钮状态
-void toolbar_set_button_enabled(Toolbar *toolbar, ToolbarButtonType button_type, bool enabled);
-void toolbar_update_button_states(Toolbar *toolbar);
+void toolbar_set_button_enabled(Toolbar *toolbar, ToolbarButtonType button_type, bool enabled);  // 设置按钮是否启用
+void toolbar_update_button_states(Toolbar *toolbar);      // 更新按钮状态
 
 // 搜索相关API
-void toolbar_search_start(Toolbar *toolbar);
-void toolbar_search_stop(Toolbar *toolbar);
-void toolbar_search_handle_text(Toolbar *toolbar, const char *text);
-void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode);
+void toolbar_search_start(Toolbar *toolbar);         // 启动搜索功能
+void toolbar_search_stop(Toolbar *toolbar);         // 停止搜索功能
+void toolbar_search_handle_text(Toolbar *toolbar, const char *text);      // 处理文本输入
+void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode);  // 处理按键输入
 
-// 地址栏相关API   （暂时不实现）
-void toolbar_address_bar_start(Toolbar *toolbar);
-void toolbar_address_bar_stop(Toolbar *toolbar);
-void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text);
-void toolbar_address_bar_handle_key(Toolbar *toolbar, SDL_Scancode scancode);
-void toolbar_address_bar_navigate(Toolbar *toolbar, const char *path);
+// 地址栏相关API   
+void toolbar_address_bar_start(Toolbar *toolbar);     // 启动地址栏输入
+void toolbar_address_bar_stop(Toolbar *toolbar);     // 停止地址栏输入
+void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text);  // 处理文本输入
+void toolbar_address_bar_handle_key(Toolbar *toolbar, SDL_Scancode scancode);  // 处理按键输入  
+void toolbar_address_bar_navigate(Toolbar *toolbar, const char *path);  // 导航到指定路径
 
 #endif // TOOLBAR_H
