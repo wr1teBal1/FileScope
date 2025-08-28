@@ -449,13 +449,13 @@ static void execute_button_action(Toolbar *toolbar, ToolbarButton *button) {
             navigate_forward(toolbar);
             break;
             
-        case BUTTON_UP:
-            navigate_up(toolbar);
-            break;
+        // case BUTTON_UP:
+        //     navigate_up(toolbar);
+        //     break;
             
-        case BUTTON_HOME:
-            navigate_home(toolbar);
-            break;
+        // case BUTTON_HOME:
+        //     navigate_home(toolbar);
+        //     break;
             
         case BUTTON_REFRESH:
             refresh_view(toolbar);

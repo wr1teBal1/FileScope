@@ -11,7 +11,6 @@
 #include "main_window.h"
 #include "event.h"
 #include "renderer.h"
-#include "file_monitor.h"
 
 // 应用程序主循环
 void app_run(struct Window *window, MainWindow *main_window) {
@@ -28,24 +27,6 @@ void app_run(struct Window *window, MainWindow *main_window) {
     }
     
     printf("[DEBUG] Starting main loop, window->is_running = %s\n", window->is_running ? "true" : "false");
-    
-    // 创建并启动文件监控
-    FileMonitor *file_monitor = file_monitor_create();
-    if (file_monitor) {
-        // 获取当前目录并开始监控
-        char *current_dir = fs_get_current_directory();
-        if (current_dir) {
-            printf("[DEBUG] 初始化文件监控，监控目录: %s\n", current_dir);
-            if (file_monitor_start(file_monitor, current_dir)) {
-                printf("[DEBUG] 文件监控初始化成功\n");
-            } else {
-                printf("[WARNING] 文件监控初始化失败\n");
-            }
-            free(current_dir);
-        }
-    } else {
-        printf("[WARNING] 无法创建文件监控管理器\n");
-    }
     
     // 主循环
     while (window->is_running) {
@@ -94,11 +75,6 @@ void app_run(struct Window *window, MainWindow *main_window) {
             main_window_handle_event(main_window, &event);
         }
         
-        // 处理文件监控事件
-        if (file_monitor) {
-            file_monitor_process_events(file_monitor);
-        }
-        
         // 绘制界面
         window_clear(window);           // 清除渲染器
         window_draw(window);            // 绘制窗口背景内容
@@ -107,12 +83,6 @@ void app_run(struct Window *window, MainWindow *main_window) {
         
         // 限制帧率
         SDL_Delay(16); // 约60FPS
-    }
-    
-    // 清理文件监控资源
-    if (file_monitor) {
-        file_monitor_destroy(file_monitor);
-        printf("[DEBUG] 文件监控已清理\n");
     }
 }
 
