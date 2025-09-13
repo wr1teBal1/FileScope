@@ -502,7 +502,8 @@ void context_menu_execute_action(ContextMenu *menu, MenuAction action) {
                         printf("Cannot find target file position in the list\n");
                     }
                 } else {
-                    printf("File list view reference not set\n");}]}}}
+                    printf("File list view reference not set\n");
+                }
                 }
             } else {
                 printf("No target file selected for rename\n");
