@@ -176,7 +176,7 @@ FileListView* file_list_view_new(struct Window *window) {
 
     // 加载图标
     if (!file_list_view_load_icons(view)) {
-        printf("警告：无法加载文件图标\n");
+        printf("Warning: Unable to load file icon\n");
     }
 
     return view;
@@ -1312,7 +1312,7 @@ void file_list_view_start_editing(FileListView *view, int index) {
         SDL_StartTextInput(view->window->window);
     }
     
-    printf("开始编辑文件: %s\n", filename);
+    printf("Start editing file: %s\n", filename);
 }
 
 // 停止内联编辑
@@ -1341,11 +1341,11 @@ void file_list_view_stop_editing(FileListView *view, bool save_changes) {
             if (old_path) {
                 // 执行重命名
                 if (file_ops_rename(old_path, view->edit_buffer)) {
-                    printf("文件重命名成功: %s -> %s\n", item->display_name, view->edit_buffer);
+                    printf("File renamed successfully: %s -> %s\n", item->display_name, view->edit_buffer);
                     // 刷新文件列表
                     file_list_view_refresh(view);
                 } else {
-                    printf("文件重命名失败: %s -> %s\n", item->display_name, view->edit_buffer);
+                    printf("File rename failed: %s -> %s\n", item->display_name, view->edit_buffer);
                 }
                 free(old_path);
             }
@@ -1587,7 +1587,7 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                                 if (view->on_right_click) {
                                     view->on_right_click(view, x, y, item);
                                 }
-                                printf("右键点击文件: %s\n", item->display_name);
+                                printf("Right-click on file: %s\n", item->display_name);
                             }
                             
                             return true;
@@ -1602,7 +1602,7 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                     // 如果正在编辑，取消编辑状态
                     if (view->is_editing) {
                         file_list_view_stop_editing(view, false);
-                        printf("点击空白区域，取消重命名\n");
+                        printf("Clicked on empty area, cancel rename\n");
                     }
                     // 左键点击空白区域，取消选择
                     file_list_view_select_item(view, -1);
@@ -1610,14 +1610,14 @@ bool file_list_view_handle_event(FileListView *view, SDL_Event *event) {
                     // 如果正在编辑，取消编辑状态
                     if (view->is_editing) {
                         file_list_view_stop_editing(view, false);
-                        printf("右键点击空白区域，取消重命名\n");
+                        printf("Right-clicked on empty area, cancel rename\n");
                     }
                     // 右键点击空白区域，显示空白区域右键菜单
                     file_list_view_select_item(view, -1);
                     if (view->on_right_click) {
                         view->on_right_click(view, x, y, NULL);
                     }
-                    printf("右键点击空白区域\n");
+                    printf("Right-clicked on empty area\n");
                 }
                 
                 return true;
@@ -1688,7 +1688,7 @@ void file_list_view_set_search_filter(FileListView *view, const char *search_ter
         return;
     }
     
-    printf("[DEBUG] 设置搜索过滤条件: '%s'\n", search_term ? search_term : "NULL");
+    printf("[DEBUG] Setting search filter: '%s'\n", search_term ? search_term : "NULL");
     
     // 保存当前的滚动位置和选择状态
     int saved_scroll_offset = view->scroll_offset_y;
@@ -1744,7 +1744,7 @@ void file_list_view_set_search_filter(FileListView *view, const char *search_ter
         }
     }
     
-    printf("[DEBUG] 搜索过滤已应用，保持滚动位置: %d\n", saved_scroll_offset);
+    printf("[DEBUG] Search filter applied, maintaining scroll position: %d\n", saved_scroll_offset);
 }
 
 // 清除搜索过滤条件
@@ -1753,7 +1753,7 @@ void file_list_view_clear_search_filter(FileListView *view) {
         return;
     }
     
-    printf("[DEBUG] 清除搜索过滤条件\n");
+    printf("[DEBUG] Clearing search filter\n");
     
     // 保存当前的滚动位置和选择状态
     int saved_scroll_offset = view->scroll_offset_y;
@@ -1799,7 +1799,7 @@ void file_list_view_clear_search_filter(FileListView *view) {
         }
     }
     
-    printf("[DEBUG] 搜索过滤已清除，保持滚动位置: %d\n", saved_scroll_offset);
+    printf("[DEBUG] Search filter cleared, maintaining scroll position: %d\n", saved_scroll_offset);
 }
 
 // 检查是否有搜索过滤条件

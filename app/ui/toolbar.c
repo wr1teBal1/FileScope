@@ -730,7 +730,7 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
                                 toolbar->search_text[0] = '\0'; // 将搜索文本设置为空字符串
                                 toolbar->search_cursor_pos = 0; // 将搜索光标位置设置为0
                                 toolbar_search(toolbar, ""); // 调用搜索函数 搜索文本为空
-                                printf("[DEBUG] 点击清除搜索按钮\n"); // 调试信息
+                                printf("[DEBUG] Clear search button clicked\n"); // Debug info
                                 return true; // 返回true 表示事件已处理
                             }
                         }
@@ -795,7 +795,7 @@ bool toolbar_handle_event(Toolbar *toolbar, SDL_Event *event) { //处理工具�
         case SDL_EVENT_KEY_DOWN: //键盘按下事件
             // 如果搜索栏激活，处理键盘输入
             if (toolbar->search_active) { // 如果搜索栏激活
-                printf("[DEBUG] 收到按键: %d\n", event->key.scancode); // 调试信息
+                printf("[DEBUG] Key received: %d\n", event->key.scancode); // Debug info
                 toolbar_search_handle_key(toolbar, event->key.scancode); // 处理键盘输入
                 return true; // 返回true 表示事件已处理
             }
@@ -1055,7 +1055,7 @@ void toolbar_draw(Toolbar *toolbar) {
 
 void toolbar_search_start(Toolbar *toolbar) {  // 启动搜索功能
     if (!toolbar) return; // 验证工具栏指针是否有效
-    printf("[DEBUG] 搜索栏激活\n"); // 调试信息
+    printf("[DEBUG] Search bar activated\n"); // Debug info
     toolbar->search_active = true; // 设置搜索栏激活状态为true
     
     // 不清除现有搜索文本，保持用户之前的搜索内容
@@ -1070,22 +1070,22 @@ void toolbar_search_start(Toolbar *toolbar) {  // 启动搜索功能
     // 启用SDL文本输入模式，传入窗口参数
     if (toolbar->app && toolbar->app->window) {
         SDL_StartTextInput(toolbar->app->window); // 启用SDL文本输入模式
-        printf("[DEBUG] SDL文本输入已启用\n"); // 调试信息
+        printf("[DEBUG] SDL text input enabled\n"); // Debug info
     } else {
-        printf("[WARNING] 无法启用SDL文本输入：窗口指针无效\n"); // 警告信息
+        printf("[WARNING] Unable to enable SDL text input: window pointer invalid\n"); // Warning info
     }
 }
 void toolbar_search_stop(Toolbar *toolbar) {
     if (!toolbar) return; // 验证工具栏指针是否有效
-    printf("[DEBUG] 搜索栏停止\n"); // 调试信息
+    printf("[DEBUG] Search bar stopped\n"); // Debug info
     toolbar->search_active = false; // 设置搜索栏激活状态为false
     
     // 停止SDL文本输入模式，传入窗口参数
     if (toolbar->app && toolbar->app->window) {
         SDL_StopTextInput(toolbar->app->window); // 停止SDL文本输入模式
-        printf("[DEBUG] SDL文本输入已停止\n"); // 调试信息
+        printf("[DEBUG] SDL text input stopped\n"); // Debug info
     } else {
-        printf("[WARNING] 无法停止SDL文本输入：窗口指针无效\n"); // 警告信息
+        printf("[WARNING] Unable to stop SDL text input: window pointer invalid\n"); // Warning info
     }
     
     // 不清除搜索文本，保持搜索结果可见
@@ -1093,8 +1093,8 @@ void toolbar_search_stop(Toolbar *toolbar) {
 }
 void toolbar_search_handle_text(Toolbar *toolbar, const char *text) { // 处理文本输入    
     if (!toolbar || !toolbar->search_active || !text) return; // 验证工具栏、搜索状态和文本指针是否有效
-    printf("[DEBUG] 处理文本输入: '%s', 当前文本: '%s', 光标位置: %d\n", 
-           text, toolbar->search_text, toolbar->search_cursor_pos); // 调试信息
+    printf("[DEBUG] Processing text input: '%s', current text: '%s', cursor position: %d\n", 
+           text, toolbar->search_text, toolbar->search_cursor_pos); // Debug info
     
     size_t len = strlen(toolbar->search_text); // 获取搜索文本长度
     size_t tlen = strlen(text); // 获取输入文本长度
@@ -1108,9 +1108,8 @@ void toolbar_search_handle_text(Toolbar *toolbar, const char *text) { // 处理�
                 // 参数3：移动的字节数（从光标位置到末尾的文本长度 + 1）
         memcpy(&toolbar->search_text[toolbar->search_cursor_pos], text, tlen); // 将输入文本插入到搜索文本中
         toolbar->search_cursor_pos += tlen; // 更新光标位置
-        printf("[DEBUG] 文本更新后: '%s', 光标位置: %d\n", 
-               toolbar->search_text, toolbar->search_cursor_pos);
-        
+        printf("[DEBUG] After text update: '%s', cursor position: %d\n",
+           toolbar->search_text, toolbar->search_cursor_pos); // Debug info       
         // 实时更新搜索过滤
         toolbar_search(toolbar, toolbar->search_text);
     }
@@ -1134,7 +1133,7 @@ void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {// 处�
         case SDL_SCANCODE_RETURN:
             // 执行搜索
             if (toolbar->search_text[0] != '\0') {
-                printf("[DEBUG] 执行搜索: %s\n", toolbar->search_text);
+                printf("[DEBUG] Executing search: %s\n", toolbar->search_text);
                 // 调用实际的搜索功能
                 toolbar_search(toolbar, toolbar->search_text);
             }
@@ -1159,7 +1158,7 @@ void toolbar_search_handle_key(Toolbar *toolbar, SDL_Scancode scancode) {// 处�
                 toolbar->search_text[0] = '\0';
                 toolbar->search_cursor_pos = 0;
                 toolbar_search(toolbar, "");
-                printf("[DEBUG] 清除搜索\n");
+                printf("[DEBUG] Clear search\n");
             }
             break;
         default:
@@ -1180,7 +1179,7 @@ bool toolbar_search(Toolbar *toolbar, const char *search_term) {
         return false;
     }
     
-    printf("[DEBUG] 工具栏执行搜索: '%s'\n", search_term);
+    printf("[DEBUG] Toolbar executing search: '%s'\n", search_term);
     
     // 调用文件列表视图的搜索功能
     if (search_term && strlen(search_term) > 0) {
@@ -1194,7 +1193,7 @@ bool toolbar_search(Toolbar *toolbar, const char *search_term) {
 
 void toolbar_address_bar_start(Toolbar *toolbar) {
     if (!toolbar) return;
-    printf("[DEBUG] 地址栏激活\n");
+    printf("[DEBUG] Address bar activated\n");
     toolbar->address_bar_active = true;
     // 将光标置于末尾
     toolbar->address_bar_cursor_pos = (int)strlen(toolbar->address_bar_text);
@@ -1206,7 +1205,7 @@ void toolbar_address_bar_start(Toolbar *toolbar) {
 
 void toolbar_address_bar_stop(Toolbar *toolbar) {
     if (!toolbar) return;
-    printf("[DEBUG] 地址栏停止\n");
+    printf("[DEBUG] Address bar stopped\n");
     toolbar->address_bar_active = false;
     // 停止文本输入（若搜索未激活）
     if (toolbar->app && toolbar->app->window && !toolbar->search_active) {
@@ -1224,7 +1223,7 @@ void toolbar_address_bar_handle_text(Toolbar *toolbar, const char *text) {
                 len - toolbar->address_bar_cursor_pos + 1);
         memcpy(&toolbar->address_bar_text[toolbar->address_bar_cursor_pos], text, tlen);
         toolbar->address_bar_cursor_pos += (int)tlen;
-        printf("[DEBUG] 地址栏文本: '%s'\n", toolbar->address_bar_text);
+        printf("[DEBUG] Address bar text: '%s'\n", toolbar->address_bar_text);
     }
 }
 
@@ -1264,7 +1263,7 @@ void toolbar_address_bar_navigate(Toolbar *toolbar, const char *path) {
     if (!toolbar || !path || !toolbar->app || !toolbar->app->user_data) return;
     MainWindow *mw = (MainWindow*)toolbar->app->user_data;
     if (!mw || !mw->file_list_view) return;
-    printf("[DEBUG] 地址栏导航到: %s\n", path);
+    printf("[DEBUG] Address bar navigating to: %s\n", path);
     file_list_view_load_directory(mw->file_list_view, path);
     add_to_history(toolbar, path);
 }

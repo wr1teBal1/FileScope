@@ -496,13 +496,13 @@ void context_menu_execute_action(ContextMenu *menu, MenuAction action) {
                     }
                     
                     if (item_index >= 0) {
-                        printf("开始重命名文件: %s\n", menu->target_item->name);
+                        printf("Starting file rename: %s\n", menu->target_item->name);
                         file_list_view_start_editing(menu->file_list_view, item_index);
                     } else {
-                        printf("无法找到目标文件在列表中的位置\n");
+                        printf("Cannot find target file position in the list\n");
                     }
                 } else {
-                    printf("文件列表视图引用未设置\n");
+                    printf("File list view reference not set\n");}]}}}
                 }
             } else {
                 printf("No target file selected for rename\n");
