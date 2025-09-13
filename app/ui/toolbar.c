@@ -928,7 +928,7 @@ void toolbar_draw(Toolbar *toolbar) {
     }
     // 绘制地址栏光标
     if (toolbar->address_bar_active) {
-        int caret_x = address_box_x + 8;
+        int caret_x = address_box_x + 8;     //     计算光标位置
         if (toolbar->address_bar_text[0] != '\0' && toolbar->app->font) {
             char temp_addr[1024];
             int cp = toolbar->address_bar_cursor_pos;

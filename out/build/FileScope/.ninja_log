@@ -23,3 +23,7 @@
 8121	9704	7779012648313465	CMakeFiles/FileScope.dir/platform/sdl/init_sdl.c.obj	a2e4c7778284240a
 29	1201	7779013281864944	CMakeFiles/FileScope.dir/app/ui/toolbar.c.obj	bb7bd23f300287a1
 1705	3089	7779017957486964	FileScope.exe	dc98a9d275a1263b
+28	975	7794353381586399	CMakeFiles/FileScope.dir/app/app.c.obj	85f7e8d709990ee9
+15	976	7794353381447431	CMakeFiles/FileScope.dir/app/controllers/view_ctrl.c.obj	f77beda7d365695e
+23	980	7794353381527656	CMakeFiles/FileScope.dir/app/ui/toolbar.c.obj	bb7bd23f300287a1
+980	2599	7794353391105418	FileScope.exe	b8f568070a88f4b5

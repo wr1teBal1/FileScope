@@ -78,6 +78,8 @@
         "sdl_keycode.h": "c",
         "stdbool.h": "c",
         "winbase.h": "c",
-        "system_error": "c"
+        "system_error": "c",
+        "app.h": "c",
+        "sort.h": "c"
     }
 }
