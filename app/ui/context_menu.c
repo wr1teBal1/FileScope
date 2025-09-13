@@ -504,7 +504,6 @@ void context_menu_execute_action(ContextMenu *menu, MenuAction action) {
                 } else {
                     printf("File list view reference not set\n");
                 }
-                }
             } else {
                 printf("No target file selected for rename\n");
             }
